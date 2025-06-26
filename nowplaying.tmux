@@ -12,8 +12,8 @@ nowplaying_interpolation() {
     local string="$1"
     local nowplaying_cmd="#($CURRENT_DIR/scripts/nowplaying.sh)"
     
-    # Use a more careful replacement that handles word boundaries
-    echo "$string" | sed "s/#{nowplaying}/${nowplaying_cmd}/g"
+    # Use | as delimiter instead of / to avoid conflicts with file paths
+    echo "$string" | sed "s|#{nowplaying}|${nowplaying_cmd}|g"
 }
 
 # Update status-right

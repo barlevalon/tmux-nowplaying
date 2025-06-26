@@ -53,9 +53,13 @@ tmux source ~/.tmux.conf
 
 ## Usage
 
-Add `#{nowplaying}` to your `status-left` or `status-right` in `~/.tmux.conf`:
+Add the nowplaying command to your `status-left` or `status-right` in `~/.tmux.conf`:
 
 ```bash
+# Direct command (recommended)
+set -g status-right '#(~/.config/tmux/plugins/tmux-nowplaying-macos/scripts/nowplaying.sh) | %H:%M'
+
+# Or use the interpolation (may require tmux restart)
 set -g status-right '#{nowplaying} | %H:%M'
 ```
 
