@@ -53,17 +53,15 @@ tmux source ~/.tmux.conf
 
 ## Usage
 
-Add the nowplaying command to your `status-left` or `status-right` in `~/.tmux.conf`:
+Add `#{nowplaying}` to your `status-left` or `status-right` in `~/.tmux.conf`:
 
 ```bash
-# Direct command (recommended)
-set -g status-right '#(~/.config/tmux/plugins/tmux-nowplaying-macos/scripts/nowplaying.sh) | %H:%M'
-
-# Or use the interpolation (may require tmux restart)
 set -g status-right '#{nowplaying} | %H:%M'
 ```
 
 The plugin will display the currently playing track in the format: `♪ Artist - Title`
+
+Note: After installing the plugin, you may need to reload your tmux configuration (`prefix + r` or `tmux source ~/.tmux.conf`) for the interpolation to take effect.
 
 ## Configuration
 
