@@ -1,0 +1,18 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Swift
+.build/
+*.xcodeproj
+*.xcworkspace
+*.swiftpm
+
+# Vim
+*.swp
+*.swo
+*~
+
+# tmux
+*.log
