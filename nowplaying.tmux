@@ -7,24 +7,25 @@ tmux set-option -gq "@nowplaying_playing_icon" "♪ "
 tmux set-option -gq "@nowplaying_paused_icon" ""
 tmux set-option -gq "@nowplaying_stopped_icon" ""
 
-# This is a simplified approach - we'll just create a command alias
-# that tmux can use directly
-nowplaying_cmd="#($CURRENT_DIR/scripts/nowplaying.sh)"
+# Create the interpolation function
+nowplaying_interpolation() {
+    local string="$1"
+    local nowplaying_cmd="#($CURRENT_DIR/scripts/nowplaying.sh)"
+    
+    # Use a more careful replacement that handles word boundaries
+    echo "$string" | sed "s/#{nowplaying}/${nowplaying_cmd}/g"
+}
 
-# Get current status-right value
+# Update status-right
 status_right_value="$(tmux show-option -gqv status-right)"
-
-# Replace #{nowplaying} with the actual command
 if [[ "$status_right_value" == *"#{nowplaying}"* ]]; then
-    new_status_right="${status_right_value//\#{nowplaying}/$nowplaying_cmd}"
+    new_status_right="$(nowplaying_interpolation "$status_right_value")"
     tmux set-option -g status-right "$new_status_right"
 fi
 
-# Get current status-left value
+# Update status-left  
 status_left_value="$(tmux show-option -gqv status-left)"
-
-# Replace #{nowplaying} with the actual command
 if [[ "$status_left_value" == *"#{nowplaying}"* ]]; then
-    new_status_left="${status_left_value//\#{nowplaying}/$nowplaying_cmd}"
+    new_status_left="$(nowplaying_interpolation "$status_left_value")"
     tmux set-option -g status-left "$new_status_left"
 fi
