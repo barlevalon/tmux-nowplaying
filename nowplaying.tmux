@@ -18,14 +18,16 @@ nowplaying_interpolation() {
 
 # Update status-right
 status_right_value="$(tmux show-option -gqv status-right)"
-if [[ "$status_right_value" == *"#{nowplaying}"* ]]; then
+# Only update if it contains the interpolation string and doesn't already have our script
+if [[ "$status_right_value" == *"#{nowplaying}"* ]] && [[ "$status_right_value" != *"nowplaying.sh"* ]]; then
     new_status_right="$(nowplaying_interpolation "$status_right_value")"
     tmux set-option -g status-right "$new_status_right"
 fi
 
 # Update status-left  
 status_left_value="$(tmux show-option -gqv status-left)"
-if [[ "$status_left_value" == *"#{nowplaying}"* ]]; then
+# Only update if it contains the interpolation string and doesn't already have our script
+if [[ "$status_left_value" == *"#{nowplaying}"* ]] && [[ "$status_left_value" != *"nowplaying.sh"* ]]; then
     new_status_left="$(nowplaying_interpolation "$status_left_value")"
     tmux set-option -g status-left "$new_status_left"
 fi
