@@ -52,21 +52,16 @@ scrolling_text() {
     # Calculate the starting position based on offset
     local start_pos=$((offset % (text_length + ${#padding})))
     
-    # Extract the visible portion
-    local visible=""
-    local chars_needed="$max_width"
-    local pos="$start_pos"
-    
-    while [ "$chars_needed" -gt 0 ]; do
-        if [ "$pos" -ge "$padded_length" ]; then
-            pos=0
-        fi
-        visible="${visible}${padded_text:$pos:1}"
-        ((pos++))
-        ((chars_needed--))
-    done
-    
-    echo "$visible"
+    # Extract the visible portion efficiently
+    # If we can get the whole substring without wrapping
+    if [ $((start_pos + max_width)) -le "$padded_length" ]; then
+        printf "%.*s\n" "$max_width" "${padded_text:$start_pos}"
+    else
+        # Need to wrap around - get first part and second part
+        local first_part_len=$((padded_length - start_pos))
+        local second_part_len=$((max_width - first_part_len))
+        printf "%s%.*s\n" "${padded_text:$start_pos}" "$second_part_len" "$padded_text"
+    fi
 }
 
 # Get current time in seconds for scrolling offset
