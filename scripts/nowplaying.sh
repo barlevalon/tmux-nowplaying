@@ -25,6 +25,11 @@ STOPPED_ICON="${STOPPED_ICON:-}"
 SCROLLING_ENABLED="$(get_tmux_option "@nowplaying_scrolling_enabled" "no")"
 SCROLLABLE_THRESHOLD="$(get_tmux_option "@nowplaying_scrollable_threshold" "30")"
 
+# Validate threshold
+if [ "$SCROLLABLE_THRESHOLD" -lt 1 ]; then
+    SCROLLABLE_THRESHOLD=30
+fi
+
 # Store original interval if not already stored (only if scrolling is enabled)
 if [ "$SCROLLING_ENABLED" == "yes" ]; then
     ORIGINAL_INTERVAL="$(get_tmux_option "@nowplaying_original_interval" "")"
