@@ -164,6 +164,20 @@ swift --version
 
 The first run may be slower as Swift compiles the script. Subsequent runs will be faster.
 
+### Scrolling settings persist after removal
+
+tmux options remain set even after removing them from your config. To fully disable scrolling after removing the configuration:
+
+```bash
+# Explicitly disable scrolling
+tmux set-option -g @nowplaying_scrolling_enabled "no"
+
+# Or unset all plugin options to restore defaults
+tmux set-option -gu @nowplaying_scrolling_enabled
+tmux set-option -gu @nowplaying_scrollable_threshold
+tmux set-option -gu @nowplaying_scroll_speed
+```
+
 ## Contributing
 
 Pull requests are welcome! Please feel free to submit issues or PRs.
