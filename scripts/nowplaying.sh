@@ -23,11 +23,11 @@ STOPPED_ICON="${STOPPED_ICON:-}"
 
 # Get scrolling options
 SCROLLING_ENABLED="$(get_tmux_option "@nowplaying_scrolling_enabled" "no")"
-SCROLLABLE_THRESHOLD="$(get_tmux_option "@nowplaying_scrollable_threshold" "30")"
+SCROLLABLE_THRESHOLD="$(get_tmux_option "@nowplaying_scrollable_threshold" "50")"
 
 # Validate threshold
 if [ "$SCROLLABLE_THRESHOLD" -lt 1 ]; then
-    SCROLLABLE_THRESHOLD=30
+    SCROLLABLE_THRESHOLD=50
 fi
 
 # Store original interval if not already stored (only if scrolling is enabled)
@@ -67,11 +67,17 @@ if [ -n "$output" ]; then
         fi
     fi
     
-    if [ "$SCROLLING_ENABLED" == "yes" ] && [ "$output_length" -gt "$SCROLLABLE_THRESHOLD" ]; then
-        # Get scroll offset based on current time
-        offset="$(get_scroll_offset)"
-        scrolled_output="$(scrolling_text "$output" "$SCROLLABLE_THRESHOLD" "$offset")"
-        echo "${PLAYING_ICON}${scrolled_output}"
+    if [ "$output_length" -gt "$SCROLLABLE_THRESHOLD" ]; then
+        if [ "$SCROLLING_ENABLED" == "yes" ]; then
+            # Get scroll offset based on current time
+            offset="$(get_scroll_offset)"
+            scrolled_output="$(scrolling_text "$output" "$SCROLLABLE_THRESHOLD" "$offset")"
+            echo "${PLAYING_ICON}${scrolled_output}"
+        else
+            # Truncate with ellipsis when scrolling is disabled
+            truncated="${output:0:$((SCROLLABLE_THRESHOLD - 3))}..."
+            echo "${PLAYING_ICON}${truncated}"
+        fi
     else
         echo "${PLAYING_ICON}${output}"
     fi

@@ -26,7 +26,7 @@ if [ -z "$(tmux show-option -gqv "@nowplaying_scrolling_enabled")" ]; then
     tmux set-option -g "@nowplaying_scrolling_enabled" "no"
 fi
 if [ -z "$(tmux show-option -gqv "@nowplaying_scrollable_threshold")" ]; then
-    tmux set-option -g "@nowplaying_scrollable_threshold" "30"
+    tmux set-option -g "@nowplaying_scrollable_threshold" "50"
 fi
 if [ -z "$(tmux show-option -gqv "@nowplaying_scroll_speed")" ]; then
     tmux set-option -g "@nowplaying_scroll_speed" "1"
