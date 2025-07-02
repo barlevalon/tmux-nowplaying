@@ -12,6 +12,7 @@ A tmux plugin that displays currently playing media from macOS's system-wide Now
 - ⚡ Uses macOS's native MediaRemote framework
 - 🎯 No external dependencies (pure Swift + bash)
 - 🔧 Customizable icons and formatting
+- 📜 Optional scrolling for long artist/title text
 
 ## Requirements
 
@@ -78,6 +79,25 @@ set -g @nowplaying_paused_icon "⏸ "
 set -g @nowplaying_stopped_icon "⏹ "
 ```
 
+### Scrolling Text
+
+When the artist and title text is too long, it can automatically scroll:
+
+```bash
+# Enable/disable scrolling text (default: "no")
+set -g @nowplaying_scrolling_enabled "yes"
+
+# Maximum characters before scrolling (default: 50, minimum: 1)
+set -g @nowplaying_scrollable_threshold 50
+
+# Scroll speed multiplier (default: 1, range: 1-10)
+# Higher values = faster scrolling
+set -g @nowplaying_scroll_speed 1
+
+# Padding between text repetitions (default: "   ")
+set -g @nowplaying_scroll_padding "   "
+```
+
 ### Auto-update
 
 The plugin automatically updates when tmux refreshes the status bar. You can control the refresh rate:
@@ -85,7 +105,20 @@ The plugin automatically updates when tmux refreshes the status bar. You can con
 ```bash
 # Refresh every 2 seconds (default: 15)
 set -g status-interval 2
+
+# Enable automatic interval adjustment for smooth scrolling (default: "no")
+# Only works when scrolling is enabled
+set -g @nowplaying_auto_interval "yes"
+
+# Interval when playing and scrolling (default: 1)
+set -g @nowplaying_playing_interval 1
 ```
+
+By default, the plugin automatically manages the refresh rate:
+- **1 second** when text is scrolling for smooth animation
+- **Your original status-interval** when music is stopped or text fits without scrolling
+- The plugin remembers your original `status-interval` and restores it when not scrolling
+- You can disable this automatic management by setting `@nowplaying_auto_interval` to "no"
 
 ## How It Works
 
@@ -130,6 +163,20 @@ swift --version
 ### Slow performance
 
 The first run may be slower as Swift compiles the script. Subsequent runs will be faster.
+
+### Scrolling settings persist after removal
+
+tmux options remain set even after removing them from your config. To fully disable scrolling after removing the configuration:
+
+```bash
+# Explicitly disable scrolling
+tmux set-option -g @nowplaying_scrolling_enabled "no"
+
+# Or unset all plugin options to restore defaults
+tmux set-option -gu @nowplaying_scrolling_enabled
+tmux set-option -gu @nowplaying_scrollable_threshold
+tmux set-option -gu @nowplaying_scroll_speed
+```
 
 ## Contributing
 
