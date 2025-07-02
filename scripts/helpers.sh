@@ -72,6 +72,12 @@ scrolling_text() {
 # Get current time in seconds for scrolling offset
 get_scroll_offset() {
     local speed="$(get_tmux_option "@nowplaying_scroll_speed" "1")"
+    # Bound speed between 1 and 10 to prevent overflow
+    if [ "$speed" -lt 1 ]; then
+        speed=1
+    elif [ "$speed" -gt 10 ]; then
+        speed=10
+    fi
     # Use current seconds as base, multiply by speed for faster/slower scrolling
     echo $(($(date +%s) * speed))
 }

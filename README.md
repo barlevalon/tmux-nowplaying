@@ -91,7 +91,7 @@ set -g @nowplaying_scrollable_threshold 30
 # Note: Currently always shows "Artist - Title" format
 set -g @nowplaying_scrollable_format "{artist} - {title}"
 
-# Scroll speed multiplier (default: 1)
+# Scroll speed multiplier (default: 1, range: 1-10)
 # Higher values = faster scrolling
 set -g @nowplaying_scroll_speed 1
 
@@ -115,7 +115,11 @@ set -g @nowplaying_auto_interval "yes"
 set -g @nowplaying_playing_interval 1
 ```
 
-By default, the plugin automatically adjusts the refresh rate to 1 second when text is scrolling to ensure smooth animation. You can disable this by setting `@nowplaying_auto_interval` to "no".
+By default, the plugin automatically manages the refresh rate:
+- **1 second** when text is scrolling for smooth animation
+- **Your original status-interval** when music is stopped or text fits without scrolling
+- The plugin remembers your original `status-interval` and restores it when not scrolling
+- You can disable this automatic management by setting `@nowplaying_auto_interval` to "no"
 
 ## How It Works
 
