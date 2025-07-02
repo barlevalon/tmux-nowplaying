@@ -12,6 +12,7 @@ A tmux plugin that displays currently playing media from macOS's system-wide Now
 - ⚡ Uses macOS's native MediaRemote framework
 - 🎯 No external dependencies (pure Swift + bash)
 - 🔧 Customizable icons and formatting
+- 📜 Automatic scrolling for long artist/title text
 
 ## Requirements
 
@@ -78,6 +79,26 @@ set -g @nowplaying_paused_icon "⏸ "
 set -g @nowplaying_stopped_icon "⏹ "
 ```
 
+### Scrolling Text
+
+When the artist and title text is too long, it can automatically scroll:
+
+```bash
+# Maximum characters before scrolling (default: 30)
+set -g @nowplaying_scrollable_threshold 30
+
+# Format for scrollable text (default: "{artist} - {title}")
+# Note: Currently always shows "Artist - Title" format
+set -g @nowplaying_scrollable_format "{artist} - {title}"
+
+# Scroll speed multiplier (default: 1)
+# Higher values = faster scrolling
+set -g @nowplaying_scroll_speed 1
+
+# Padding between text repetitions (default: "   ")
+set -g @nowplaying_scroll_padding "   "
+```
+
 ### Auto-update
 
 The plugin automatically updates when tmux refreshes the status bar. You can control the refresh rate:
@@ -85,7 +106,16 @@ The plugin automatically updates when tmux refreshes the status bar. You can con
 ```bash
 # Refresh every 2 seconds (default: 15)
 set -g status-interval 2
+
+# Enable automatic interval adjustment for smooth scrolling (default: "yes")
+# Set to "no" to disable automatic status-interval adjustment
+set -g @nowplaying_auto_interval "yes"
+
+# Interval when playing and scrolling (default: 1)
+set -g @nowplaying_playing_interval 1
 ```
+
+By default, the plugin automatically adjusts the refresh rate to 1 second when text is scrolling to ensure smooth animation. You can disable this by setting `@nowplaying_auto_interval` to "no".
 
 ## How It Works
 
