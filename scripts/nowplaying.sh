@@ -23,7 +23,6 @@ STOPPED_ICON="${STOPPED_ICON:-}"
 
 # Get scrolling options
 SCROLLABLE_THRESHOLD="$(get_tmux_option "@nowplaying_scrollable_threshold" "30")"
-SCROLLABLE_FORMAT="$(get_tmux_option "@nowplaying_scrollable_format" "{artist} - {title}")"
 
 # Store original interval if not already stored
 ORIGINAL_INTERVAL="$(get_tmux_option "@nowplaying_original_interval" "")"

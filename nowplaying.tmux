@@ -17,7 +17,6 @@ tmux set-option -gq "@nowplaying_stopped_icon" ""
 
 # Default scrolling options
 tmux set-option -gq "@nowplaying_scrollable_threshold" "30"
-tmux set-option -gq "@nowplaying_scrollable_format" "{artist} - {title}"
 tmux set-option -gq "@nowplaying_scroll_speed" "1"
 tmux set-option -gq "@nowplaying_scroll_padding" "   "
 tmux set-option -gq "@nowplaying_auto_interval" "yes"
@@ -47,6 +46,3 @@ if [[ "$status_left_value" == *"#{nowplaying}"* ]] && [[ "$status_left_value" !=
     new_status_left="$(nowplaying_interpolation "$status_left_value")"
     tmux set-option -g status-left "$new_status_left"
 fi
-
-# The interval management is now handled entirely in nowplaying.sh
-# This ensures we properly track and restore the user's original interval

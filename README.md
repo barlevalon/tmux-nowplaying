@@ -87,10 +87,6 @@ When the artist and title text is too long, it can automatically scroll:
 # Maximum characters before scrolling (default: 30)
 set -g @nowplaying_scrollable_threshold 30
 
-# Format for scrollable text (default: "{artist} - {title}")
-# Note: Currently always shows "Artist - Title" format
-set -g @nowplaying_scrollable_format "{artist} - {title}"
-
 # Scroll speed multiplier (default: 1, range: 1-10)
 # Higher values = faster scrolling
 set -g @nowplaying_scroll_speed 1
