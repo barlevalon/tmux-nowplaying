@@ -16,10 +16,11 @@ tmux set-option -gq "@nowplaying_paused_icon" ""
 tmux set-option -gq "@nowplaying_stopped_icon" ""
 
 # Default scrolling options
+tmux set-option -gq "@nowplaying_scrolling_enabled" "no"
 tmux set-option -gq "@nowplaying_scrollable_threshold" "30"
 tmux set-option -gq "@nowplaying_scroll_speed" "1"
 tmux set-option -gq "@nowplaying_scroll_padding" "   "
-tmux set-option -gq "@nowplaying_auto_interval" "yes"
+tmux set-option -gq "@nowplaying_auto_interval" "no"
 tmux set-option -gq "@nowplaying_playing_interval" "1"
 
 # Create the interpolation function
