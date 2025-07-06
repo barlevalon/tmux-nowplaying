@@ -1,8 +1,9 @@
-# Agent Instructions for tmux-nowplaying-macos
+# Agent Instructions for tmux-nowplaying
 
 ## Build/Test Commands
 - Test plugin directly: `./scripts/nowplaying.sh`
-- Test Swift component: `swift scripts/nowplaying_mediaremote.swift`
+- Test macOS component: `swift scripts/nowplaying_mediaremote.swift`
+- Test Linux component: `./scripts/nowplaying_linux.sh`
 - Test single script: `bash -n scripts/nowplaying.sh` (syntax check)
 - Verify permissions: `chmod +x scripts/*.sh scripts/*.swift`
 - Test tmux integration: `tmux source-file ~/.tmux.conf && tmux`
@@ -16,8 +17,16 @@
 - **tmux Integration**: Use `tmux show-option -gqv` for reading options, respect user customization, maintain backwards compatibility
 - **Path Handling**: Always use absolute paths via `CURRENT_DIR` or `SCRIPT_DIR` variables, handle spaces in paths
 - **Icons/Formatting**: Support customizable icons via tmux options, provide sensible defaults, keep output single-line
-- **Dependencies**: No external dependencies - only macOS system frameworks, bash, and swift runtime
+- **Dependencies**: 
+  - macOS: No external dependencies - only system frameworks, bash, and swift runtime
+  - Linux: playerctl for MPRIS support (user must install)
 - **Output Format**: Concise single line "Artist - Title" with optional icon prefix, handle missing metadata gracefully
-- **Compatibility**: Support tmux 2.9+ and macOS 10.15+, use MediaRemote private framework for universal app support
-- **Testing**: Test with various media apps (Spotify, Apple Music, YouTube in browser), verify scrolling behavior
+- **Compatibility**: 
+  - tmux 2.9+ on all platforms
+  - macOS 10.15+ with MediaRemote private framework
+  - Linux with MPRIS D-Bus interface via playerctl
+- **Testing**: 
+  - macOS: Test with Spotify, Apple Music, YouTube in browser
+  - Linux: Test with spotify-player, VLC, Firefox/Chrome media
+  - Verify scrolling behavior on both platforms
 - **Commit Messages**: Never mention AI agents, Claude, or similar tools in commit messages or code comments

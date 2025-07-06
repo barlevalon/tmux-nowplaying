@@ -44,8 +44,21 @@ if [ "$SCROLLING_ENABLED" == "yes" ]; then
     fi
 fi
 
-# Get now playing info from Swift script
-output="$("$SCRIPT_DIR/nowplaying_mediaremote.swift" 2>/dev/null)"
+# Get now playing info based on OS
+case "$(uname -s)" in
+    Darwin)
+        # macOS - use Swift MediaRemote
+        output="$("$SCRIPT_DIR/nowplaying_mediaremote.swift" 2>/dev/null)"
+        ;;
+    Linux)
+        # Linux - use playerctl (MPRIS)
+        output="$("$SCRIPT_DIR/nowplaying_linux.sh" 2>/dev/null)"
+        ;;
+    *)
+        # Unsupported OS
+        output=""
+        ;;
+esac
 
 # Handle auto-interval adjustment
 AUTO_INTERVAL="$(get_tmux_option "@nowplaying_auto_interval" "no")"
