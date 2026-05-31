@@ -37,6 +37,12 @@ set -g @plugin 'barlevalon/tmux-nowplaying'
 
 Press `prefix + I`.
 
+To pin a release, include the tag:
+
+```tmux
+set -g @plugin 'barlevalon/tmux-nowplaying#v1.1.0'
+```
+
 ### Manual
 
 ```bash
