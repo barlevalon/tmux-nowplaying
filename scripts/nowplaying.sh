@@ -24,12 +24,7 @@ STOPPED_ICON="${STOPPED_ICON:-}"
 
 # Get scrolling options
 SCROLLING_ENABLED="$(get_tmux_option "@nowplaying_scrolling_enabled" "no")"
-SCROLLABLE_THRESHOLD="$(get_tmux_option "@nowplaying_scrollable_threshold" "50")"
-
-# Validate threshold
-if [ "$SCROLLABLE_THRESHOLD" -lt 1 ]; then
-    SCROLLABLE_THRESHOLD=50
-fi
+SCROLLABLE_THRESHOLD="$(get_tmux_integer_option "@nowplaying_scrollable_threshold" "50" "4")"
 
 # Store original interval if not already stored (only if scrolling is enabled)
 if [ "$SCROLLING_ENABLED" == "yes" ]; then
@@ -73,7 +68,7 @@ if [ -n "$output" ]; then
     if [ "$SCROLLING_ENABLED" == "yes" ] && [ "$AUTO_INTERVAL" == "yes" ]; then
         if [ "$output_length" -gt "$SCROLLABLE_THRESHOLD" ]; then
             # Set faster interval for scrolling
-            PLAYING_INTERVAL="$(get_tmux_option "@nowplaying_playing_interval" "1")"
+            PLAYING_INTERVAL="$(get_tmux_integer_option "@nowplaying_playing_interval" "1" "1")"
             tmux set-option -g status-interval "$PLAYING_INTERVAL"
         else
             # Restore original interval when not scrolling

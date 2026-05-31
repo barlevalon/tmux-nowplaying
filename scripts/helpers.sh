@@ -28,6 +28,29 @@ get_tmux_option() {
     fi
 }
 
+# Get integer tmux option, clamped to optional min/max bounds.
+get_tmux_integer_option() {
+    local option="$1"
+    local default_value="$2"
+    local min_value="${3:-}"
+    local max_value="${4:-}"
+    local option_value
+
+    option_value="$(get_tmux_option "$option" "$default_value")"
+
+    if [[ ! "$option_value" =~ ^[0-9]+$ ]]; then
+        option_value="$default_value"
+    fi
+    if [[ -n "$min_value" && "$option_value" -lt "$min_value" ]]; then
+        option_value="$min_value"
+    fi
+    if [[ -n "$max_value" && "$option_value" -gt "$max_value" ]]; then
+        option_value="$max_value"
+    fi
+
+    echo "$option_value"
+}
+
 # Scrolling text function
 # Arguments:
 #   $1 - text to scroll
@@ -69,13 +92,7 @@ scrolling_text() {
 # Get current time in seconds for scrolling offset
 get_scroll_offset() {
     local speed
-    speed="$(get_tmux_option "@nowplaying_scroll_speed" "1")"
-    # Bound speed between 1 and 10 to prevent overflow
-    if [ "$speed" -lt 1 ]; then
-        speed=1
-    elif [ "$speed" -gt 10 ]; then
-        speed=10
-    fi
+    speed="$(get_tmux_integer_option "@nowplaying_scroll_speed" "1" "1" "10")"
     # Use current seconds as base, multiply by speed for faster/slower scrolling
     echo $(($(date +%s) * speed))
 }

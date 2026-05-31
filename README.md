@@ -80,10 +80,10 @@ set -g @nowplaying_playing_icon "🎵 "
 # Enable scrolling for long text. Default: "no"
 set -g @nowplaying_scrolling_enabled "yes"
 
-# Width before scrolling/truncation. Default: 50
+# Width before scrolling/truncation. Default: 50, minimum: 4
 set -g @nowplaying_scrollable_threshold 50
 
-# Scroll speed, 1-10. Default: 1
+# Scroll speed. Default: 1, range: 1-10
 set -g @nowplaying_scroll_speed 1
 
 # Gap between repeated scrolling text. Default: "   "
