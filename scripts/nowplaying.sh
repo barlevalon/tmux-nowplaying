@@ -13,18 +13,11 @@ else
 fi
 
 # Get user options
-PLAYING_ICON="$(tmux show-option -gqv "@nowplaying_playing_icon")"
-PAUSED_ICON="$(tmux show-option -gqv "@nowplaying_paused_icon")"
-STOPPED_ICON="$(tmux show-option -gqv "@nowplaying_stopped_icon")"
-
-# Default icons if not set
-PLAYING_ICON="${PLAYING_ICON:-♪ }"
-PAUSED_ICON="${PAUSED_ICON:-}"
-STOPPED_ICON="${STOPPED_ICON:-}"
+PLAYING_ICON="$(get_nowplaying_option "@nowplaying_playing_icon")"
 
 # Get scrolling options
-SCROLLING_ENABLED="$(get_tmux_option "@nowplaying_scrolling_enabled" "no")"
-SCROLLABLE_THRESHOLD="$(get_tmux_integer_option "@nowplaying_scrollable_threshold" "50" "4")"
+SCROLLING_ENABLED="$(get_nowplaying_option "@nowplaying_scrolling_enabled")"
+SCROLLABLE_THRESHOLD="$(get_nowplaying_integer_option "@nowplaying_scrollable_threshold" "4")"
 
 # Store original interval if not already stored (only if scrolling is enabled)
 if [ "$SCROLLING_ENABLED" == "yes" ]; then
@@ -57,7 +50,7 @@ case "$(uname -s)" in
 esac
 
 # Handle auto-interval adjustment
-AUTO_INTERVAL="$(get_tmux_option "@nowplaying_auto_interval" "no")"
+AUTO_INTERVAL="$(get_nowplaying_option "@nowplaying_auto_interval")"
 
 # If we got output, process and display it
 if [ -n "$output" ]; then
@@ -68,7 +61,7 @@ if [ -n "$output" ]; then
     if [ "$SCROLLING_ENABLED" == "yes" ] && [ "$AUTO_INTERVAL" == "yes" ]; then
         if [ "$output_length" -gt "$SCROLLABLE_THRESHOLD" ]; then
             # Set faster interval for scrolling
-            PLAYING_INTERVAL="$(get_tmux_integer_option "@nowplaying_playing_interval" "1" "1")"
+            PLAYING_INTERVAL="$(get_nowplaying_integer_option "@nowplaying_playing_interval" "1")"
             tmux set-option -g status-interval "$PLAYING_INTERVAL"
         else
             # Restore original interval when not scrolling

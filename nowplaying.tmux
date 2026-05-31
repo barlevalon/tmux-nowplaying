@@ -11,35 +11,7 @@ else
 fi
 
 # Default options (only set if not already defined)
-if [ -z "$(tmux show-option -gqv "@nowplaying_playing_icon")" ]; then
-    tmux set-option -g "@nowplaying_playing_icon" "♪ "
-fi
-if [ -z "$(tmux show-option -gqv "@nowplaying_paused_icon")" ]; then
-    tmux set-option -g "@nowplaying_paused_icon" ""
-fi
-if [ -z "$(tmux show-option -gqv "@nowplaying_stopped_icon")" ]; then
-    tmux set-option -g "@nowplaying_stopped_icon" ""
-fi
-
-# Default scrolling options (only set if not already defined)
-if [ -z "$(tmux show-option -gqv "@nowplaying_scrolling_enabled")" ]; then
-    tmux set-option -g "@nowplaying_scrolling_enabled" "no"
-fi
-if [ -z "$(tmux show-option -gqv "@nowplaying_scrollable_threshold")" ]; then
-    tmux set-option -g "@nowplaying_scrollable_threshold" "50"
-fi
-if [ -z "$(tmux show-option -gqv "@nowplaying_scroll_speed")" ]; then
-    tmux set-option -g "@nowplaying_scroll_speed" "1"
-fi
-if [ -z "$(tmux show-option -gqv "@nowplaying_scroll_padding")" ]; then
-    tmux set-option -g "@nowplaying_scroll_padding" "   "
-fi
-if [ -z "$(tmux show-option -gqv "@nowplaying_auto_interval")" ]; then
-    tmux set-option -g "@nowplaying_auto_interval" "no"
-fi
-if [ -z "$(tmux show-option -gqv "@nowplaying_playing_interval")" ]; then
-    tmux set-option -g "@nowplaying_playing_interval" "1"
-fi
+set_nowplaying_default_options
 
 # Create the interpolation function
 nowplaying_interpolation() {

@@ -18,6 +18,51 @@ get_tmux_option() {
     fi
 }
 
+# Print the built-in default for a nowplaying tmux option.
+get_nowplaying_default_option() {
+    case "$1" in
+        "@nowplaying_playing_icon") printf '%s\n' "♪ " ;;
+        "@nowplaying_paused_icon") printf '%s\n' "" ;;
+        "@nowplaying_stopped_icon") printf '%s\n' "" ;;
+        "@nowplaying_scrolling_enabled") printf '%s\n' "no" ;;
+        "@nowplaying_scrollable_threshold") printf '%s\n' "50" ;;
+        "@nowplaying_scroll_speed") printf '%s\n' "1" ;;
+        "@nowplaying_scroll_padding") printf '%s\n' "   " ;;
+        "@nowplaying_auto_interval") printf '%s\n' "no" ;;
+        "@nowplaying_playing_interval") printf '%s\n' "1" ;;
+        *) return 1 ;;
+    esac
+}
+
+# Set every nowplaying tmux option default without overriding user values.
+set_nowplaying_default_options() {
+    local option
+    for option in \
+        "@nowplaying_playing_icon" \
+        "@nowplaying_paused_icon" \
+        "@nowplaying_stopped_icon" \
+        "@nowplaying_scrolling_enabled" \
+        "@nowplaying_scrollable_threshold" \
+        "@nowplaying_scroll_speed" \
+        "@nowplaying_scroll_padding" \
+        "@nowplaying_auto_interval" \
+        "@nowplaying_playing_interval"
+    do
+        if [ -z "$(tmux show-option -gqv "$option")" ]; then
+            tmux set-option -g "$option" "$(get_nowplaying_default_option "$option")"
+        fi
+    done
+}
+
+# Get a nowplaying tmux option with its built-in default.
+get_nowplaying_option() {
+    local option="$1"
+    local default_value
+
+    default_value="$(get_nowplaying_default_option "$option")" || default_value=""
+    get_tmux_option "$option" "$default_value"
+}
+
 # Get integer tmux option, clamped to optional min/max bounds.
 get_tmux_integer_option() {
     local option="$1"
@@ -41,6 +86,15 @@ get_tmux_integer_option() {
     echo "$option_value"
 }
 
+# Get integer nowplaying option with its built-in default.
+get_nowplaying_integer_option() {
+    local option="$1"
+    local min_value="${2:-}"
+    local max_value="${3:-}"
+
+    get_tmux_integer_option "$option" "$(get_nowplaying_option "$option")" "$min_value" "$max_value"
+}
+
 # Scrolling text function
 # Arguments:
 #   $1 - text to scroll
@@ -60,7 +114,7 @@ scrolling_text() {
     
     # Get padding from tmux option
     local padding
-    padding="$(get_tmux_option "@nowplaying_scroll_padding" "   ")"
+    padding="$(get_nowplaying_option "@nowplaying_scroll_padding")"
     local padded_text="${text}${padding}${text}"
     local padded_length="${#padded_text}"
     
@@ -82,7 +136,7 @@ scrolling_text() {
 # Get current time in seconds for scrolling offset
 get_scroll_offset() {
     local speed
-    speed="$(get_tmux_integer_option "@nowplaying_scroll_speed" "1" "1" "10")"
+    speed="$(get_nowplaying_integer_option "@nowplaying_scroll_speed" "1" "10")"
     # Use current seconds as base, multiply by speed for faster/slower scrolling
     echo $(($(date +%s) * speed))
 }
