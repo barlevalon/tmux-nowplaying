@@ -9,6 +9,7 @@
   - Linux: `scripts/nowplaying_linux.sh`
 
 ## Test commands
+- Test suite: `./scripts/test.sh`
 - Main script: `./scripts/nowplaying.sh`
 - Shell syntax: `bash -n nowplaying.tmux scripts/*.sh`
 - Linux adapter: `./scripts/nowplaying_linux.sh` (requires `playerctl` and a playing MPRIS source)
