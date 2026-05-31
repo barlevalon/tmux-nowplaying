@@ -2,16 +2,6 @@
 
 # Helper functions for tmux-nowplaying
 
-# Get tmux version
-_tmux_version() {
-    tmux -V | cut -d ' ' -f 2
-}
-
-# Check if tmux version is >= 2.9
-_tmux_version_ok() {
-    [[ "$(_tmux_version)" == 2.9* ]] || [[ "$(_tmux_version)" == 3.* ]]
-}
-
 # Get tmux option with default value
 get_tmux_option() {
     local option="$1"
