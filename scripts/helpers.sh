@@ -95,6 +95,57 @@ get_nowplaying_integer_option() {
     get_tmux_integer_option "$option" "$(get_nowplaying_option "$option")" "$min_value" "$max_value"
 }
 
+# Get the tmux status interval to restore after temporary scrolling changes.
+get_nowplaying_original_interval() {
+    local original_interval
+    local current_interval
+
+    original_interval="$(get_tmux_option "@nowplaying_original_interval" "")"
+    if [ -n "$original_interval" ]; then
+        echo "$original_interval"
+        return
+    fi
+
+    current_interval="$(tmux show-option -gqv status-interval)"
+    if [ -n "$current_interval" ]; then
+        tmux set-option -gq "@nowplaying_original_interval" "$current_interval" >/dev/null
+        echo "$current_interval"
+    else
+        echo "15"
+    fi
+}
+
+# Temporarily lower status-interval for scrolling output, or restore it.
+update_nowplaying_status_interval() {
+    local output_length="$1"
+    local scrollable_threshold="$2"
+    local scrolling_enabled
+    local auto_interval
+    local original_interval
+    local playing_interval
+
+    scrolling_enabled="$(get_nowplaying_option "@nowplaying_scrolling_enabled")"
+    auto_interval="$(get_nowplaying_option "@nowplaying_auto_interval")"
+
+    if [ "$scrolling_enabled" != "yes" ] || [ "$auto_interval" != "yes" ]; then
+        return
+    fi
+
+    original_interval="$(get_nowplaying_original_interval)"
+
+    if [ "$output_length" -gt "$scrollable_threshold" ]; then
+        playing_interval="$(get_nowplaying_integer_option "@nowplaying_playing_interval" "1")"
+        tmux set-option -g status-interval "$playing_interval"
+    else
+        tmux set-option -g status-interval "$original_interval"
+    fi
+}
+
+# Restore status-interval when there is no renderable track.
+restore_nowplaying_status_interval() {
+    update_nowplaying_status_interval 0 1
+}
+
 # Scrolling text function
 # Arguments:
 #   $1 - text to scroll
