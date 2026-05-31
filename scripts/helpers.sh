@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Helper functions for tmux-nowplaying-macos plugin
+# Helper functions for tmux-nowplaying
 
 # Get tmux version
 _tmux_version() {
@@ -16,7 +16,8 @@ _tmux_version_ok() {
 get_tmux_option() {
     local option="$1"
     local default_value="$2"
-    local option_value="$(tmux show-option -qv "$option")"
+    local option_value
+    option_value="$(tmux show-option -qv "$option")"
     if [ -z "$option_value" ]; then
         option_value="$(tmux show-option -gqv "$option")"
     fi
@@ -45,7 +46,8 @@ scrolling_text() {
     fi
     
     # Get padding from tmux option
-    local padding="$(get_tmux_option "@nowplaying_scroll_padding" "   ")"
+    local padding
+    padding="$(get_tmux_option "@nowplaying_scroll_padding" "   ")"
     local padded_text="${text}${padding}${text}"
     local padded_length="${#padded_text}"
     
@@ -66,7 +68,8 @@ scrolling_text() {
 
 # Get current time in seconds for scrolling offset
 get_scroll_offset() {
-    local speed="$(get_tmux_option "@nowplaying_scroll_speed" "1")"
+    local speed
+    speed="$(get_tmux_option "@nowplaying_scroll_speed" "1")"
     # Bound speed between 1 and 10 to prevent overflow
     if [ "$speed" -lt 1 ]; then
         speed=1

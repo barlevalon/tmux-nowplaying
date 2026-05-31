@@ -1,30 +1,46 @@
 ---
 name: Bug report
-about: Create a report to help us improve
+about: Report a tmux-nowplaying problem
 title: ''
 labels: bug
 assignees: ''
-
 ---
 
-**Describe the bug**
-A clear and concise description of what the bug is.
+## Describe the bug
 
-**To Reproduce**
-Steps to reproduce the behavior:
-1. ...
-2. ...
+What happened?
 
-**Expected behavior**
-A clear and concise description of what you expected to happen.
+## Reproduce
 
-**Screenshots**
-If applicable, add screenshots to help explain your problem.
+1.
+2.
+3.
 
-**Environment:**
- - macOS version: [e.g. Sonoma 14.5]
- - tmux version: [e.g. 3.4]
- - Shell: [e.g. zsh]
+## Expected behavior
 
-**Additional context**
-Add any other context about the problem here.
+What should have happened?
+
+## Environment
+
+- OS and version:
+- tmux version:
+- Install method: TPM / manual
+- Player app:
+- Linux only: `playerctl --version` output:
+
+## Diagnostics
+
+```bash
+~/.tmux/plugins/tmux-nowplaying/scripts/nowplaying.sh
+```
+
+Linux:
+
+```bash
+playerctl -l
+playerctl metadata
+```
+
+## Additional context
+
+Screenshots, tmux status config, or other details.

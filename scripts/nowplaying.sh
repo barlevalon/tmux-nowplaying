@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source helper functions
 if [ -f "$SCRIPT_DIR/helpers.sh" ]; then
+    # shellcheck source=scripts/helpers.sh
     source "$SCRIPT_DIR/helpers.sh"
 else
     echo "Error: helpers.sh not found" >&2

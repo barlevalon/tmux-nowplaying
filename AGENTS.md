@@ -1,32 +1,38 @@
-# Agent Instructions for tmux-nowplaying
+# Agent instructions for tmux-nowplaying
 
-## Build/Test Commands
-- Test plugin directly: `./scripts/nowplaying.sh`
-- Test macOS component: `swift scripts/nowplaying_mediaremote.swift`
-- Test Linux component: `./scripts/nowplaying_linux.sh`
-- Test single script: `bash -n scripts/nowplaying.sh` (syntax check)
-- Verify permissions: `chmod +x scripts/*.sh scripts/*.swift`
-- Test tmux integration: `tmux source-file ~/.tmux.conf && tmux`
-- No build/lint commands required (interpreted scripts only)
+## Project shape
+- tmux plugin entrypoint: `nowplaying.tmux`
+- Runtime script: `scripts/nowplaying.sh`
+- Shared shell helpers: `scripts/helpers.sh`
+- Platform adapters:
+  - macOS: `scripts/nowplaying_mediaremote.swift`
+  - Linux: `scripts/nowplaying_linux.sh`
 
-## Code Style Guidelines
-- **Shell Scripts**: Use bash shebang `#!/usr/bin/env bash`, quote all variables `"${VAR}"`, use `[[ ]]` for conditionals, follow shellcheck recommendations
-- **Swift Scripts**: Use shebang `#!/usr/bin/env swift`, handle optionals safely with guard/if-let, no external dependencies
-- **File Permissions**: All scripts must be executable (755)
-- **Error Handling**: Redirect stderr to /dev/null for user-facing commands, use proper exit codes (0=success, 1=error)
-- **tmux Integration**: Use `tmux show-option -gqv` for reading options, respect user customization, maintain backwards compatibility
-- **Path Handling**: Always use absolute paths via `CURRENT_DIR` or `SCRIPT_DIR` variables, handle spaces in paths
-- **Icons/Formatting**: Support customizable icons via tmux options, provide sensible defaults, keep output single-line
-- **Dependencies**: 
-  - macOS: No external dependencies - only system frameworks, bash, and swift runtime
-  - Linux: playerctl for MPRIS support (user must install)
-- **Output Format**: Concise single line "Artist - Title" with optional icon prefix, handle missing metadata gracefully
-- **Compatibility**: 
-  - tmux 2.9+ on all platforms
-  - macOS 10.15+ with MediaRemote private framework
-  - Linux with MPRIS D-Bus interface via playerctl
-- **Testing**: 
-  - macOS: Test with Spotify, Apple Music, YouTube in browser
-  - Linux: Test with spotify-player, VLC, Firefox/Chrome media
-  - Verify scrolling behavior on both platforms
-- **Commit Messages**: Never mention AI agents, Claude, or similar tools in commit messages or code comments
+## Test commands
+- Main script: `./scripts/nowplaying.sh`
+- Shell syntax: `bash -n nowplaying.tmux scripts/*.sh`
+- Linux adapter: `./scripts/nowplaying_linux.sh` (requires `playerctl` and a playing MPRIS source)
+- macOS adapter: `swift scripts/nowplaying_mediaremote.swift`
+- tmux integration: source the plugin from a tmux session and render `#{nowplaying}` in `status-left` or `status-right`
+- Permissions check: scripts intended to execute must stay mode `755`
+
+## Compatibility targets
+- tmux 2.9+
+- macOS 10.15+ with Swift runtime and MediaRemote private framework
+- Linux with D-Bus/MPRIS via `playerctl`
+
+## Code style
+- Shell: bash, `[[ ]]`, quote variables, handle paths with spaces, keep user-facing stderr quiet.
+- Swift: no external dependencies, safe optional handling, exit non-zero for adapter failure.
+- tmux options: read with `tmux show-option -gqv` or `get_tmux_option`; preserve user overrides.
+- Output: single line only; empty output means “nothing renderable now playing”.
+- Dependencies: do not add runtime dependencies beyond Swift on macOS and `playerctl` on Linux.
+
+## Documentation rules
+- Keep `README.md` short and user-facing: install, usage, options, troubleshooting.
+- Do not document options that current code cannot actually render.
+- Keep platform-specific claims tied to the current adapter implementations.
+
+## Git hygiene
+- Do not add compatibility symlinks for agent files (`AGENT.md`, `CLAUDE.md`). `AGENTS.md` is the source of truth.
+- Do not mention AI tools or agents in commits, PRs, changelog entries, or code comments.

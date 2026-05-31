@@ -46,8 +46,7 @@ nowplaying_interpolation() {
     local string="$1"
     local nowplaying_cmd="#($CURRENT_DIR/scripts/nowplaying.sh)"
     
-    # Use | as delimiter instead of / to avoid conflicts with file paths
-    echo "$string" | sed "s|#{nowplaying}|${nowplaying_cmd}|g"
+    printf '%s\n' "${string//\#\{nowplaying\}/${nowplaying_cmd}}"
 }
 
 # Update status-right
