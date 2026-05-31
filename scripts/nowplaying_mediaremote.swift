@@ -32,11 +32,15 @@ if result == .timedOut {
     exit(1)
 }
 
-// Extract and format the information
-if let info = nowPlayingInfo,
-   let artist = info["kMRMediaRemoteNowPlayingInfoArtist"] as? String,
-   let title = info["kMRMediaRemoteNowPlayingInfoTitle"] as? String,
-   let playbackRate = info["kMRMediaRemoteNowPlayingInfoPlaybackRate"] as? Double,
-   playbackRate == 1.0 {
-    print("\(artist) - \(title)")
+// Extract and format the information.
+// Adapter output format: status<TAB>artist<TAB>title.
+if let info = nowPlayingInfo {
+    let artist = info["kMRMediaRemoteNowPlayingInfoArtist"] as? String ?? ""
+    let title = info["kMRMediaRemoteNowPlayingInfoTitle"] as? String ?? ""
+    let playbackRate = info["kMRMediaRemoteNowPlayingInfoPlaybackRate"] as? Double ?? 0.0
+
+    if !artist.isEmpty || !title.isEmpty {
+        let status = playbackRate == 1.0 ? "Playing" : "Paused"
+        print("\(status)\t\(artist)\t\(title)")
+    }
 }

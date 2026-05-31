@@ -95,6 +95,46 @@ get_nowplaying_integer_option() {
     get_tmux_integer_option "$option" "$(get_nowplaying_option "$option")" "$min_value" "$max_value"
 }
 
+# Format metadata from a platform adapter into display text.
+format_nowplaying_metadata() {
+    local artist="$1"
+    local title="$2"
+
+    if [ -n "$artist" ] && [ -n "$title" ]; then
+        printf '%s - %s\n' "$artist" "$title"
+    elif [ -n "$title" ]; then
+        printf '%s\n' "$title"
+    fi
+}
+
+# Get icon for a playback status.
+get_nowplaying_status_icon() {
+    case "$1" in
+        Paused) get_nowplaying_option "@nowplaying_paused_icon" ;;
+        Stopped) get_nowplaying_option "@nowplaying_stopped_icon" ;;
+        *) get_nowplaying_option "@nowplaying_playing_icon" ;;
+    esac
+}
+
+# Parse adapter output.
+# Preferred adapter format: status<TAB>artist<TAB>title.
+# Plain text remains supported as playing metadata for compatibility.
+parse_nowplaying_adapter_output() {
+    local adapter_output="$1"
+    local status
+    local artist
+    local title
+    local text
+
+    if [[ "$adapter_output" == *$'\t'* ]]; then
+        IFS=$'\t' read -r status artist title <<< "$adapter_output"
+        text="$(format_nowplaying_metadata "$artist" "$title")"
+        printf '%s\t%s\n' "${status:-Playing}" "$text"
+    else
+        printf 'Playing\t%s\n' "$adapter_output"
+    fi
+}
+
 # Get the tmux status interval to restore after temporary scrolling changes.
 get_nowplaying_original_interval() {
     local original_interval

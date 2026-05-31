@@ -1,36 +1,47 @@
 #!/usr/bin/env bash
 
-# Get now playing info using playerctl (MPRIS)
-# This works with any Linux media player that supports MPRIS:
-# Spotify, spotify-player, VLC, Firefox, Chrome, Rhythmbox, etc.
+# Get now playing info using playerctl (MPRIS).
+# Adapter output format: status<TAB>artist<TAB>title.
 
-# Check if playerctl is available
-if ! command -v playerctl &> /dev/null; then
+if ! command -v playerctl >/dev/null 2>&1; then
     exit 0
 fi
 
-# Get the first player that is actually playing
-# This handles multiple players and picks the active one
-playing_player=""
-for player in $(playerctl -l 2>/dev/null); do
-    status=$(playerctl -p "$player" status 2>/dev/null)
-    if [ "$status" = "Playing" ]; then
-        playing_player="$player"
-        break
-    fi
-done
+selected_player=""
+selected_status=""
 
-# If we found a playing player, get its metadata
-if [ -n "$playing_player" ]; then
-    # Get metadata
-    artist=$(playerctl -p "$playing_player" metadata artist 2>/dev/null)
-    title=$(playerctl -p "$playing_player" metadata title 2>/dev/null)
-    
-    # Only output if we have both artist and title
-    if [ -n "$artist" ] && [ -n "$title" ]; then
-        echo "$artist - $title"
-    elif [ -n "$title" ]; then
-        # Some players only provide title
-        echo "$title"
-    fi
+# Prefer an actively playing player, then fall back to paused/stopped players
+# that still expose metadata.
+while IFS= read -r player; do
+    status="$(playerctl -p "$player" status 2>/dev/null)"
+    case "$status" in
+        Playing)
+            selected_player="$player"
+            selected_status="$status"
+            break
+            ;;
+        Paused)
+            if [ -z "$selected_player" ] || [ "$selected_status" = "Stopped" ]; then
+                selected_player="$player"
+                selected_status="$status"
+            fi
+            ;;
+        Stopped)
+            if [ -z "$selected_player" ]; then
+                selected_player="$player"
+                selected_status="$status"
+            fi
+            ;;
+    esac
+done < <(playerctl -l 2>/dev/null)
+
+if [ -z "$selected_player" ]; then
+    exit 0
+fi
+
+artist="$(playerctl -p "$selected_player" metadata artist 2>/dev/null)"
+title="$(playerctl -p "$selected_player" metadata title 2>/dev/null)"
+
+if [ -n "$artist" ] || [ -n "$title" ]; then
+    printf '%s\t%s\t%s\n' "$selected_status" "$artist" "$title"
 fi

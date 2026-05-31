@@ -12,9 +12,6 @@ else
     exit 1
 fi
 
-# Get user options
-PLAYING_ICON="$(get_nowplaying_option "@nowplaying_playing_icon")"
-
 # Get scrolling options
 SCROLLING_ENABLED="$(get_nowplaying_option "@nowplaying_scrolling_enabled")"
 SCROLLABLE_THRESHOLD="$(get_nowplaying_integer_option "@nowplaying_scrollable_threshold" "4")"
@@ -37,23 +34,30 @@ esac
 
 # If we got output, process and display it
 if [ -n "$output" ]; then
+    parsed_output="$(parse_nowplaying_adapter_output "$output")"
+    IFS=$'\t' read -r playback_status track_text <<< "$parsed_output"
+fi
+
+if [ -n "${track_text:-}" ]; then
+    status_icon="$(get_nowplaying_status_icon "$playback_status")"
+
     # Check if scrolling is needed
-    output_length="${#output}"
+    output_length="${#track_text}"
     update_nowplaying_status_interval "$output_length" "$SCROLLABLE_THRESHOLD"
     
     if [ "$output_length" -gt "$SCROLLABLE_THRESHOLD" ]; then
         if [ "$SCROLLING_ENABLED" == "yes" ]; then
             # Get scroll offset based on current time
             offset="$(get_scroll_offset)"
-            scrolled_output="$(scrolling_text "$output" "$SCROLLABLE_THRESHOLD" "$offset")"
-            echo "${PLAYING_ICON}${scrolled_output}"
+            scrolled_output="$(scrolling_text "$track_text" "$SCROLLABLE_THRESHOLD" "$offset")"
+            echo "${status_icon}${scrolled_output}"
         else
             # Truncate with ellipsis when scrolling is disabled
-            truncated="${output:0:$((SCROLLABLE_THRESHOLD - 3))}..."
-            echo "${PLAYING_ICON}${truncated}"
+            truncated="${track_text:0:$((SCROLLABLE_THRESHOLD - 3))}..."
+            echo "${status_icon}${truncated}"
         fi
     else
-        echo "${PLAYING_ICON}${output}"
+        echo "${status_icon}${track_text}"
     fi
 else
     # No music playing - restore original interval

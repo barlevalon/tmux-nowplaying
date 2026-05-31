@@ -25,7 +25,7 @@
 - Shell: bash, `[[ ]]`, quote variables, handle paths with spaces, keep user-facing stderr quiet.
 - Swift: no external dependencies, safe optional handling, exit non-zero for adapter failure.
 - tmux options: read with `tmux show-option -gqv` or `get_tmux_option`; preserve user overrides.
-- Output: single line only; empty output means “nothing renderable now playing”.
+- Adapter output: single line `Status<TAB>Artist<TAB>Title`; empty output means “nothing renderable now playing”.
 - Dependencies: do not add runtime dependencies beyond Swift on macOS and `playerctl` on Linux.
 
 ## Documentation rules

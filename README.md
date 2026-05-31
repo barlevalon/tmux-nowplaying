@@ -69,13 +69,19 @@ When media is playing, output looks like:
 ♪ Artist - Title
 ```
 
-Nothing is shown when no supported player is actively playing.
+Paused media is shown when the platform reports track metadata. Nothing is shown when no supported player has renderable metadata.
 
 ## Options
 
 ```tmux
 # Prefix for playing media. Default: "♪ "
 set -g @nowplaying_playing_icon "🎵 "
+
+# Prefix for paused media. Default: ""
+set -g @nowplaying_paused_icon "⏸ "
+
+# Prefix for stopped media with metadata. Default: ""
+set -g @nowplaying_stopped_icon "⏹ "
 
 # Enable scrolling for long text. Default: "no"
 set -g @nowplaying_scrolling_enabled "yes"
