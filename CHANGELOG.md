@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## [1.1.0] - 2026-05-31
 ### Added
 - Linux MPRIS adapter now reports playback status and metadata separately.
 - Paused and stopped media can render with configurable icons when metadata is available.
