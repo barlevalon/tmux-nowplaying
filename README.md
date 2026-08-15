@@ -1,3 +1,5 @@
+
+
 # tmux-nowplaying
 
 Show the currently playing track in your tmux status bar.
@@ -75,7 +77,7 @@ When media is playing, output looks like:
 ♪ Artist - Title
 ```
 
-Paused media is shown when the platform reports track metadata. Nothing is shown when no supported player has renderable metadata.
+Paused or stopped media is shown when the platform reports track metadata. Nothing is shown when no supported player has renderable metadata.
 
 ## Options
 
