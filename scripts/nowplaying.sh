@@ -32,13 +32,17 @@ case "$(uname -s)" in
         ;;
 esac
 
+playback_status=""
+track_artist=""
+track_title=""
+track_text=""
+
 # If we got output, process and display it
-if [ -n "$output" ]; then
-    parsed_output="$(parse_nowplaying_adapter_output "$output")"
-    IFS=$'\t' read -r playback_status track_text <<< "$parsed_output"
+if [ -n "$output" ] && parse_nowplaying_adapter_output "$output" playback_status track_artist track_title; then
+    track_text="$(format_nowplaying_metadata "$track_artist" "$track_title")"
 fi
 
-if [ -n "${track_text:-}" ]; then
+if [ -n "$track_text" ]; then
     status_icon="$(get_nowplaying_status_icon "$playback_status")"
 
     # Check if scrolling is needed
