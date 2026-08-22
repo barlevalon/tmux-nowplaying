@@ -31,9 +31,11 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Install tmux
+        run: brew install tmux
       - name: Test with system Bash 3.2
         env:
-          PATH: /usr/bin:/bin:/usr/sbin:/sbin
+          PATH: /usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/usr/local/bin
         run: |
           /bin/bash --version
           /bin/bash -n nowplaying.tmux scripts/*.sh
