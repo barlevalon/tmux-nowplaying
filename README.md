@@ -40,7 +40,7 @@ Press `prefix + I`.
 To pin a release, include the tag:
 
 ```tmux
-set -g @plugin 'barlevalon/tmux-nowplaying#v1.1.0'
+set -g @plugin 'barlevalon/tmux-nowplaying#v1.1.1'
 ```
 
 ### Manual
@@ -113,7 +113,10 @@ set -g status-interval 2
 For smoother scrolling, the plugin can schedule a client refresh while long text is scrolling. This does not change `status-interval`:
 
 ```tmux
+# Schedule smoother scrolling refreshes. Default: "no"
 set -g @nowplaying_auto_interval "yes"
+
+# Seconds between scheduled refreshes. Default/minimum: 1
 set -g @nowplaying_playing_interval 1
 ```
 
