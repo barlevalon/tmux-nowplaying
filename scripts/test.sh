@@ -3,8 +3,10 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMP_DIR="$(mktemp -d)"
+TMUX_MOCK_STATE_DIR="${TMP_DIR}/tmux-state"
 REAL_TMUX=""
 TMUX_TEST_SERVER=""
+export TMUX_MOCK_STATE_DIR
 
 cleanup() {
     if [[ -n "$REAL_TMUX" && -n "$TMUX_TEST_SERVER" ]]; then
@@ -86,6 +88,7 @@ assert_scrolling_text() {
 }
 
 write_tmux_mock() {
+    mkdir -p "$TMUX_MOCK_STATE_DIR"
     cat > "${TMP_DIR}/tmux" <<'MOCK'
 #!/usr/bin/env bash
 if [[ "$1" == "show-option" ]]; then
@@ -96,6 +99,13 @@ if [[ "$1" == "show-option" ]]; then
     fi
 
     case "$scope:$option" in
+        global:status-left|global:status-right)
+            if [[ -f "$TMUX_MOCK_STATE_DIR/$option" ]]; then
+                cat "$TMUX_MOCK_STATE_DIR/$option"
+            else
+                exit 1
+            fi
+            ;;
         global:@nowplaying_playing_icon) printf '♪ ' ;;
         global:@nowplaying_paused_icon) printf '⏸ ' ;;
         global:@nowplaying_stopped_icon) printf '⏹ ' ;;
@@ -118,7 +128,12 @@ if [[ "$1" == "show-option" ]]; then
         *) exit 1 ;;
     esac
 elif [[ "$1 $2" == "set-option -g" || "$1 $2" == "set-option -gq" ]]; then
-    :
+    option="$3"
+    value="$4"
+    if [[ "$option" == "status-left" || "$option" == "status-right" ]]; then
+        printf '%s' "$value" > "$TMUX_MOCK_STATE_DIR/$option"
+        printf '%s\t%s\n' "$option" "$value" >> "$TMUX_MOCK_STATE_DIR/status-writes"
+    fi
 fi
 MOCK
     chmod +x "${TMP_DIR}/tmux"
@@ -213,6 +228,25 @@ run_with_mocks() {
     PATH="${TMP_DIR}:${PATH}" "$@"
 }
 
+seed_status_values() {
+    printf '%s' "$1" > "$TMUX_MOCK_STATE_DIR/status-left"
+    printf '%s' "$2" > "$TMUX_MOCK_STATE_DIR/status-right"
+    : > "$TMUX_MOCK_STATE_DIR/status-writes"
+}
+
+read_status_value() {
+    cat "$TMUX_MOCK_STATE_DIR/$1"
+}
+
+status_write_count() {
+    awk -F '\t' -v option="$1" '$1 == option { count++ } END { print count + 0 }' \
+        "$TMUX_MOCK_STATE_DIR/status-writes"
+}
+
+run_entrypoint() {
+    run_with_mocks bash "$1/nowplaying.tmux"
+}
+
 resolve_with_mock() {
     PATH="${TMP_DIR}:${PATH}" bash -c 'source "$1"; get_tmux_option "$2" "$3"' \
         _ "${ROOT_DIR}/scripts/helpers.sh" "$1" "$2"
@@ -296,7 +330,7 @@ WRAPPER
     printf 'ok - plugin load does not create nowplaying default options\n'
 
     actual="$("$REAL_TMUX" -L "$TMUX_TEST_SERVER" show-option -gqv status-right)"
-    assert_eq "before#(${ROOT_DIR}/scripts/nowplaying.sh)after" "$actual" "status interpolation remains active"
+    assert_eq "before#(\"${ROOT_DIR}/scripts/nowplaying.sh\")after" "$actual" "status interpolation remains active"
 
     "$REAL_TMUX" -L "$TMUX_TEST_SERVER" set-option -g @nowplaying_playing_icon ""
     "$REAL_TMUX" -L "$TMUX_TEST_SERVER" set-option -g @nowplaying_scroll_padding "pad  "
@@ -313,6 +347,46 @@ bash -n "${ROOT_DIR}/nowplaying.tmux" "${ROOT_DIR}"/scripts/*.sh
 printf 'ok - bash syntax\n'
 
 write_tmux_mock
+
+nowplaying_command="#(\"${ROOT_DIR}/scripts/nowplaying.sh\")"
+seed_status_values 'left #{nowplaying} / #{nowplaying}' 'right #{nowplaying}'
+run_entrypoint "$ROOT_DIR"
+assert_eq "left ${nowplaying_command} / ${nowplaying_command}" "$(read_status_value status-left)" "entrypoint replaces every left placeholder"
+assert_eq "right ${nowplaying_command}" "$(read_status_value status-right)" "entrypoint replaces right placeholder"
+assert_eq "1" "$(status_write_count status-left)" "entrypoint writes status-left once"
+assert_eq "1" "$(status_write_count status-right)" "entrypoint writes status-right once"
+
+: > "$TMUX_MOCK_STATE_DIR/status-writes"
+run_entrypoint "$ROOT_DIR"
+assert_eq "left ${nowplaying_command} / ${nowplaying_command}" "$(read_status_value status-left)" "entrypoint reload preserves status-left"
+assert_eq "right ${nowplaying_command}" "$(read_status_value status-right)" "entrypoint reload preserves status-right"
+assert_eq "0" "$(status_write_count status-left)" "entrypoint reload does not write status-left"
+assert_eq "0" "$(status_write_count status-right)" "entrypoint reload does not write status-right"
+
+seed_status_values '#(/tmp/custom-nowplaying.sh) | #{nowplaying}' 'unchanged right'
+run_entrypoint "$ROOT_DIR"
+assert_eq "#(/tmp/custom-nowplaying.sh) | ${nowplaying_command}" "$(read_status_value status-left)" "entrypoint preserves unrelated nowplaying command"
+assert_eq "unchanged right" "$(read_status_value status-right)" "entrypoint preserves status without placeholder"
+assert_eq "1" "$(status_write_count status-left)" "mixed command status is written once"
+assert_eq "0" "$(status_write_count status-right)" "status without placeholder is not written"
+
+spaced_root="${TMP_DIR}/plugin with spaces"
+mkdir -p "$spaced_root/scripts"
+cp -p "${ROOT_DIR}/nowplaying.tmux" "$spaced_root/nowplaying.tmux"
+cp -p "${ROOT_DIR}/scripts/helpers.sh" "${ROOT_DIR}/scripts/nowplaying.sh" "$spaced_root/scripts/"
+spaced_command="#(\"${spaced_root}/scripts/nowplaying.sh\")"
+seed_status_values 'prefix #{nowplaying} suffix' 'plain right'
+run_entrypoint "$spaced_root"
+assert_eq "prefix ${spaced_command} suffix" "$(read_status_value status-left)" "entrypoint quotes a command path containing spaces"
+assert_eq "1" "$(status_write_count status-left)" "path-with-spaces installation writes once"
+assert_eq "0" "$(status_write_count status-right)" "path-with-spaces no-placeholder side is not written"
+
+seed_status_values '#(/tmp/custom-nowplaying.sh)' '#{nowplaying } and #{other}'
+run_entrypoint "$ROOT_DIR"
+assert_eq '#(/tmp/custom-nowplaying.sh)' "$(read_status_value status-left)" "entrypoint leaves unrelated command unchanged"
+assert_eq '#{nowplaying } and #{other}' "$(read_status_value status-right)" "entrypoint leaves near-match formats unchanged"
+assert_eq "0" "$(status_write_count status-left)" "unrelated command triggers no left write"
+assert_eq "0" "$(status_write_count status-right)" "near-match formats trigger no right write"
 
 assert_eq "fallback" "$(resolve_with_mock @test_absent fallback)" "mock absent option uses fallback"
 assert_eq "" "$(resolve_with_mock @test_global_empty fallback)" "mock empty global option wins"
