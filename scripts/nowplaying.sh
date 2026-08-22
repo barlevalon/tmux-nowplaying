@@ -42,13 +42,13 @@ if [ -n "$output" ] && parse_nowplaying_adapter_output "$output" playback_status
     track_text="$(format_nowplaying_metadata "$track_artist" "$track_title")"
 fi
 
+output_length="${#track_text}"
+update_nowplaying_status_interval "$output_length" "$SCROLLABLE_THRESHOLD"
+
 if [ -n "$track_text" ]; then
     status_icon="$(get_nowplaying_status_icon "$playback_status")"
 
     # Check if scrolling is needed
-    output_length="${#track_text}"
-    update_nowplaying_status_interval "$output_length" "$SCROLLABLE_THRESHOLD"
-    
     if [ "$output_length" -gt "$SCROLLABLE_THRESHOLD" ]; then
         if [ "$SCROLLING_ENABLED" == "yes" ]; then
             # Get scroll offset based on current time
@@ -63,7 +63,4 @@ if [ -n "$track_text" ]; then
     else
         echo "${status_icon}${track_text}"
     fi
-else
-    # No music playing - restore original interval
-    restore_nowplaying_status_interval
 fi
