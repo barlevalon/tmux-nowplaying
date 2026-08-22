@@ -10,9 +10,6 @@ else
     exit 1
 fi
 
-# Default options (only set if not already defined)
-set_nowplaying_default_options
-
 # Create the interpolation function
 nowplaying_interpolation() {
     local string="$1"

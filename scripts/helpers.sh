@@ -7,14 +7,13 @@ get_tmux_option() {
     local option="$1"
     local default_value="$2"
     local option_value
-    option_value="$(tmux show-option -qv "$option")"
-    if [ -z "$option_value" ]; then
-        option_value="$(tmux show-option -gqv "$option")"
-    fi
-    if [ -z "$option_value" ]; then
-        echo "$default_value"
+
+    if option_value="$(tmux show-option -v "$option" 2>/dev/null)"; then
+        printf '%s\n' "$option_value"
+    elif option_value="$(tmux show-option -gv "$option" 2>/dev/null)"; then
+        printf '%s\n' "$option_value"
     else
-        echo "$option_value"
+        printf '%s\n' "$default_value"
     fi
 }
 
@@ -32,26 +31,6 @@ get_nowplaying_default_option() {
         "@nowplaying_playing_interval") printf '%s\n' "1" ;;
         *) return 1 ;;
     esac
-}
-
-# Set every nowplaying tmux option default without overriding user values.
-set_nowplaying_default_options() {
-    local option
-    for option in \
-        "@nowplaying_playing_icon" \
-        "@nowplaying_paused_icon" \
-        "@nowplaying_stopped_icon" \
-        "@nowplaying_scrolling_enabled" \
-        "@nowplaying_scrollable_threshold" \
-        "@nowplaying_scroll_speed" \
-        "@nowplaying_scroll_padding" \
-        "@nowplaying_auto_interval" \
-        "@nowplaying_playing_interval"
-    do
-        if [ -z "$(tmux show-option -gqv "$option")" ]; then
-            tmux set-option -g "$option" "$(get_nowplaying_default_option "$option")"
-        fi
-    done
 }
 
 # Get a nowplaying tmux option with its built-in default.
