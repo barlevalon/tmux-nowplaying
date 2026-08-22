@@ -32,15 +32,22 @@ if result == .timedOut {
     exit(1)
 }
 
+func sanitizedMetadata(_ value: String) -> String {
+    return value
+        .replacingOccurrences(of: "\t", with: " ")
+        .replacingOccurrences(of: "\r", with: " ")
+        .replacingOccurrences(of: "\n", with: " ")
+}
+
 // Extract and format the information.
 // Adapter output format: status<TAB>artist<TAB>title.
 if let info = nowPlayingInfo {
-    let artist = info["kMRMediaRemoteNowPlayingInfoArtist"] as? String ?? ""
-    let title = info["kMRMediaRemoteNowPlayingInfoTitle"] as? String ?? ""
+    let artist = sanitizedMetadata(info["kMRMediaRemoteNowPlayingInfoArtist"] as? String ?? "")
+    let title = sanitizedMetadata(info["kMRMediaRemoteNowPlayingInfoTitle"] as? String ?? "")
     let playbackRate = info["kMRMediaRemoteNowPlayingInfoPlaybackRate"] as? Double ?? 0.0
 
     if !artist.isEmpty || !title.isEmpty {
-        let status = playbackRate == 1.0 ? "Playing" : "Paused"
+        let status = playbackRate > 0.0 ? "Playing" : "Paused"
         print("\(status)\t\(artist)\t\(title)")
     }
 }

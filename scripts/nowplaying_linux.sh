@@ -39,9 +39,35 @@ if [ -z "$selected_player" ]; then
     exit 0
 fi
 
-artist="$(playerctl -p "$selected_player" metadata artist 2>/dev/null)"
-title="$(playerctl -p "$selected_player" metadata title 2>/dev/null)"
+separator=$'\034'
+snapshot="$(playerctl -p "$selected_player" metadata --format "{{status}}${separator}{{artist}}${separator}{{title}}" 2>/dev/null)" || exit 0
+
+if [[ "$snapshot" != *"$separator"* ]]; then
+    exit 0
+fi
+status="${snapshot%%"$separator"*}"
+remainder="${snapshot#*"$separator"}"
+if [[ "$remainder" != *"$separator"* ]]; then
+    exit 0
+fi
+artist="${remainder%%"$separator"*}"
+title="${remainder#*"$separator"}"
+if [[ "$title" == *"$separator"* ]]; then
+    exit 0
+fi
+
+case "$status" in
+    Playing|Paused|Stopped) ;;
+    *) exit 0 ;;
+esac
+
+artist="${artist//$'\t'/ }"
+artist="${artist//$'\r'/ }"
+artist="${artist//$'\n'/ }"
+title="${title//$'\t'/ }"
+title="${title//$'\r'/ }"
+title="${title//$'\n'/ }"
 
 if [ -n "$artist" ] || [ -n "$title" ]; then
-    printf '%s\t%s\t%s\n' "$selected_status" "$artist" "$title"
+    printf '%s\t%s\t%s\n' "$status" "$artist" "$title"
 fi

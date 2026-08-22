@@ -110,7 +110,7 @@ tmux refreshes `#(...)` commands on `status-interval`:
 set -g status-interval 2
 ```
 
-For smoother scrolling, the plugin can temporarily lower `status-interval` while long text is playing and restore the original value afterward:
+For smoother scrolling, the plugin can schedule a client refresh while long text is scrolling. This does not change `status-interval`:
 
 ```tmux
 set -g @nowplaying_auto_interval "yes"

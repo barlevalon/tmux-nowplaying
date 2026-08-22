@@ -2,6 +2,7 @@
 
 # Get the directory where this script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CLIENT_TARGET="${1:-}"
 
 # Source helper functions
 if [ -f "$SCRIPT_DIR/helpers.sh" ]; then
@@ -43,7 +44,6 @@ if [ -n "$output" ] && parse_nowplaying_adapter_output "$output" playback_status
 fi
 
 output_length="${#track_text}"
-update_nowplaying_status_interval "$output_length" "$SCROLLABLE_THRESHOLD"
 
 if [ -n "$track_text" ]; then
     status_icon="$(get_nowplaying_status_icon "$playback_status")"
@@ -51,6 +51,11 @@ if [ -n "$track_text" ]; then
     # Check if scrolling is needed
     if [ "$output_length" -gt "$SCROLLABLE_THRESHOLD" ]; then
         if [ "$SCROLLING_ENABLED" == "yes" ]; then
+            if [ -n "$CLIENT_TARGET" ] && [ "$(get_nowplaying_option "@nowplaying_auto_interval")" == "yes" ]; then
+                playing_interval="$(get_nowplaying_integer_option "@nowplaying_playing_interval" "1")"
+                (sleep "$playing_interval"; tmux refresh-client -t "$CLIENT_TARGET" -S) >/dev/null 2>&1 &
+            fi
+
             # Get scroll offset based on current time
             offset="$(get_scroll_offset)"
             scrolled_output="$(scrolling_text "$track_text" "$SCROLLABLE_THRESHOLD" "$offset")"
