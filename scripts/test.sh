@@ -32,6 +32,41 @@ assert_eq() {
     printf 'ok - %s\n' "$message"
 }
 
+assert_adapter_record() {
+    local adapter_output="$1"
+    local expected_status="$2"
+    local expected_artist="$3"
+    local expected_title="$4"
+    local message="$5"
+    local playback_status="stale"
+    local track_artist="stale"
+    local track_title="stale"
+
+    if ! parse_nowplaying_adapter_output "$adapter_output" playback_status track_artist track_title; then
+        fail "${message} was rejected"
+    fi
+
+    assert_eq "$expected_status" "$playback_status" "${message} status"
+    assert_eq "$expected_artist" "$track_artist" "${message} artist"
+    assert_eq "$expected_title" "$track_title" "${message} title"
+}
+
+assert_adapter_rejected() {
+    local adapter_output="$1"
+    local message="$2"
+    local playback_status="stale"
+    local track_artist="stale"
+    local track_title="stale"
+
+    if parse_nowplaying_adapter_output "$adapter_output" playback_status track_artist track_title; then
+        fail "${message} was accepted"
+    fi
+
+    assert_eq "" "$playback_status" "${message} clears status"
+    assert_eq "" "$track_artist" "${message} clears artist"
+    assert_eq "" "$track_title" "${message} clears title"
+}
+
 write_tmux_mock() {
     cat > "${TMP_DIR}/tmux" <<'MOCK'
 #!/usr/bin/env bash
@@ -116,6 +151,17 @@ MOCK
     '-p paused metadata artist') printf 'Old
 ' ;;
     '-p paused metadata title') printf 'Track
+' ;;
+MOCK
+            ;;
+        title_only)
+            cat >> "${TMP_DIR}/playerctl" <<'MOCK'
+    '-l') printf 'title-only
+' ;;
+    '-p title-only status') printf 'Playing
+' ;;
+    '-p title-only metadata artist') printf '' ;;
+    '-p title-only metadata title') printf 'Title
 ' ;;
 MOCK
             ;;
@@ -259,8 +305,18 @@ assert_eq "value  " "$(resolve_with_mock @test_trailing_spaces fallback)" "mock 
 helper_output="$(PATH="${TMP_DIR}:${PATH}" bash -c 'source "$1"; printf "%s %s %s %s\n" "$(get_tmux_integer_option @bad_integer 50 4)" "$(get_tmux_integer_option @empty_integer 50 4)" "$(get_tmux_integer_option @low_integer 50 4)" "$(get_tmux_integer_option @high_integer 1 1 10)"' _ "${ROOT_DIR}/scripts/helpers.sh")"
 assert_eq "50 50 4 10" "$helper_output" "integer option validation"
 
-parse_output="$(PATH="${TMP_DIR}:${PATH}" bash -c 'source "$1"; parse_nowplaying_adapter_output $'"'"'Paused\tArtist\tTitle'"'"'' _ "${ROOT_DIR}/scripts/helpers.sh")"
-assert_eq $'Paused\tArtist - Title' "$parse_output" "adapter output parsing"
+# shellcheck source=scripts/helpers.sh
+source "${ROOT_DIR}/scripts/helpers.sh"
+assert_adapter_record $'Paused\tArtist\tTitle' "Paused" "Artist" "Title" "complete adapter record"
+assert_adapter_record $'Playing\t\tTitle' "Playing" "" "Title" "title-only adapter record"
+assert_adapter_record $'Paused\tArtist\t' "Paused" "Artist" "" "artist-only adapter record"
+assert_adapter_record $'Stopped\t\t' "Stopped" "" "" "empty metadata adapter record"
+assert_adapter_rejected "plain text" "plain-text adapter output"
+assert_adapter_rejected $'Playing\tTitle' "one-tab adapter output"
+assert_adapter_rejected $'Playing\tArtist\tTitle\tExtra' "extra-tab adapter output"
+assert_adapter_rejected $'\tArtist\tTitle' "empty-status adapter output"
+assert_adapter_rejected $'Playing\tArtist\tTitle\nSecond' "multiline adapter output"
+assert_adapter_rejected $'Playing\tArtist\tTitle\r' "carriage-return adapter output"
 
 write_uname_mock
 
@@ -270,6 +326,10 @@ assert_eq "♪ Artist - Title" "$(run_with_mocks "${ROOT_DIR}/scripts/nowplaying
 
 write_playerctl_mock paused
 assert_eq "⏸ Old - Track" "$(run_with_mocks "${ROOT_DIR}/scripts/nowplaying.sh")" "main renders paused metadata"
+
+write_playerctl_mock title_only
+assert_eq $'Playing\t\tTitle' "$(run_with_mocks "${ROOT_DIR}/scripts/nowplaying_linux.sh")" "linux adapter preserves empty artist"
+assert_eq "♪ Title" "$(run_with_mocks "${ROOT_DIR}/scripts/nowplaying.sh")" "main renders title-only metadata"
 
 write_playerctl_mock stopped
 assert_eq "⏹ Done - Song" "$(run_with_mocks "${ROOT_DIR}/scripts/nowplaying.sh")" "main renders stopped metadata"

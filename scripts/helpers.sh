@@ -96,22 +96,46 @@ get_nowplaying_status_icon() {
 }
 
 # Parse adapter output.
-# Preferred adapter format: status<TAB>artist<TAB>title.
-# Plain text remains supported as playing metadata for compatibility.
+# Adapter format: status<TAB>artist<TAB>title.
 parse_nowplaying_adapter_output() {
-    local adapter_output="$1"
-    local status
-    local artist
-    local title
-    local text
+    local adapter_output_value="$1"
+    local status_output_name="$2"
+    local artist_output_name="$3"
+    local title_output_name="$4"
+    local parsed_status
+    local adapter_remainder
+    local parsed_artist
+    local parsed_title
 
-    if [[ "$adapter_output" == *$'\t'* ]]; then
-        IFS=$'\t' read -r status artist title <<< "$adapter_output"
-        text="$(format_nowplaying_metadata "$artist" "$title")"
-        printf '%s\t%s\n' "${status:-Playing}" "$text"
-    else
-        printf 'Playing\t%s\n' "$adapter_output"
+    printf -v "$status_output_name" '%s' ''
+    printf -v "$artist_output_name" '%s' ''
+    printf -v "$title_output_name" '%s' ''
+
+    case "$adapter_output_value" in
+        *$'\n'*|*$'\r'*) return 1 ;;
+    esac
+
+    if [[ "$adapter_output_value" != *$'\t'* ]]; then
+        return 1
     fi
+
+    parsed_status="${adapter_output_value%%$'\t'*}"
+    adapter_remainder="${adapter_output_value#*$'\t'}"
+
+    if [[ -z "$parsed_status" || "$adapter_remainder" != *$'\t'* ]]; then
+        return 1
+    fi
+
+    parsed_artist="${adapter_remainder%%$'\t'*}"
+    parsed_title="${adapter_remainder#*$'\t'}"
+
+    if [[ "$parsed_title" == *$'\t'* ]]; then
+        return 1
+    fi
+
+    printf -v "$status_output_name" '%s' "$parsed_status"
+    printf -v "$artist_output_name" '%s' "$parsed_artist"
+    printf -v "$title_output_name" '%s' "$parsed_title"
 }
 
 # Get the tmux status interval to restore after temporary scrolling changes.
