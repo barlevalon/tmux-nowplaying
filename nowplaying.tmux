@@ -10,26 +10,12 @@ else
     exit 1
 fi
 
-# Create the interpolation function
-nowplaying_interpolation() {
-    local string="$1"
-    local nowplaying_cmd="#($CURRENT_DIR/scripts/nowplaying.sh)"
-    
-    printf '%s\n' "${string//\#\{nowplaying\}/${nowplaying_cmd}}"
-}
+nowplaying_command="#(\"${CURRENT_DIR}/scripts/nowplaying.sh\")"
 
-# Update status-right
-status_right_value="$(tmux show-option -gqv status-right)"
-# Only update if it contains the interpolation string and doesn't already have our script
-if [[ "$status_right_value" == *"#{nowplaying}"* ]] && [[ "$status_right_value" != *"nowplaying.sh"* ]]; then
-    new_status_right="$(nowplaying_interpolation "$status_right_value")"
-    tmux set-option -g status-right "$new_status_right"
-fi
-
-# Update status-left  
-status_left_value="$(tmux show-option -gqv status-left)"
-# Only update if it contains the interpolation string and doesn't already have our script
-if [[ "$status_left_value" == *"#{nowplaying}"* ]] && [[ "$status_left_value" != *"nowplaying.sh"* ]]; then
-    new_status_left="$(nowplaying_interpolation "$status_left_value")"
-    tmux set-option -g status-left "$new_status_left"
-fi
+for status_option in status-left status-right; do
+    status_value="$(tmux show-option -gqv "$status_option")"
+    if [[ "$status_value" == *'#{nowplaying}'* ]]; then
+        updated_value="${status_value//\#\{nowplaying\}/$nowplaying_command}"
+        tmux set-option -g "$status_option" "$updated_value"
+    fi
+done
