@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.1.1] - 2026-08-22
+### Added
+- Linux and macOS CI coverage for shell tests, static checks, and Swift type-checking.
+
+### Changed
+- Scrolling now schedules client-targeted refreshes without changing tmux's `status-interval`.
+- Linux reads the selected player's final status and metadata from one coherent snapshot.
+- Simplified status interpolation and scrolling wrap logic.
+- Installation documentation now recommends pinning a stable release tag.
+
+### Fixed
+- Explicitly empty tmux options are preserved, while empty or invalid numeric options use built-in defaults before clamping.
+- Empty, title-only, and artist-only adapter metadata render correctly.
+- Adapter metadata containing tabs or line breaks no longer corrupts the record protocol.
+- Positive macOS playback rates are classified as playing.
+- Every `#{nowplaying}` placeholder in a status option is expanded safely, including plugin paths containing spaces.
+
 ## [1.1.0] - 2026-05-31
 ### Added
 - Linux MPRIS adapter now reports playback status and metadata separately.

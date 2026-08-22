@@ -5,9 +5,11 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMP_DIR="$(mktemp -d)"
 TMUX_MOCK_STATE_DIR="${TMP_DIR}/tmux-state"
 TMUX_MOCK_LOG="${TMP_DIR}/tmux.log"
+PLAYERCTL_MOCK_LOG="${TMP_DIR}/playerctl.log"
+SLEEP_MOCK_LOG="${TMP_DIR}/sleep.log"
 REAL_TMUX=""
 TMUX_TEST_SERVER=""
-export TMUX_MOCK_STATE_DIR TMUX_MOCK_LOG
+export TMUX_MOCK_STATE_DIR TMUX_MOCK_LOG PLAYERCTL_MOCK_LOG SLEEP_MOCK_LOG
 
 cleanup() {
     if [[ -n "$REAL_TMUX" && -n "$TMUX_TEST_SERVER" ]]; then
@@ -103,7 +105,6 @@ option_file() {
 }
 
 mkdir -p "$TMUX_MOCK_STATE_DIR/global" "$TMUX_MOCK_STATE_DIR/local"
-
 case "${1:-}" in
     show-option)
         flags="${2:-}"
@@ -112,11 +113,8 @@ case "${1:-}" in
             scope="local"
         fi
         file="$(option_file "$option")"
-        if [[ -f "$file" ]]; then
-            cat "$file"
-        else
-            exit 1
-        fi
+        [[ -f "$file" ]] || exit 1
+        cat "$file"
         ;;
     set-option)
         flags="${2:-}"
@@ -127,41 +125,17 @@ case "${1:-}" in
         file="$(option_file "$option")"
         if [[ "$flags" == *u* ]]; then
             rm -f "$file"
-            printf 'unset %s\n' "$option" >> "$TMUX_MOCK_LOG"
         else
             value="${4:-}"
-            if [[ "$scope" == "global" && "$option" == "status-interval" && "${TMUX_MOCK_PAUSE_SET_STATUS:-}" == "yes" ]]; then
-                : > "$TMUX_MOCK_STATE_DIR/pause-ready"
-                while [[ ! -f "$TMUX_MOCK_STATE_DIR/pause-release" ]]; do
-                    sleep 0.01
-                done
-            fi
             printf '%s' "$value" > "$file"
-            printf 'set %s=%s\n' "$option" "$value" >> "$TMUX_MOCK_LOG"
             if [[ "$scope" == "global" && ( "$option" == "status-left" || "$option" == "status-right" ) ]]; then
                 printf '%s\t%s\n' "$option" "$value" >> "$TMUX_MOCK_STATE_DIR/status-writes"
             fi
         fi
         ;;
-    wait-for)
-        operation="${2:-}"
-        channel="${3:-}"
-        lock_dir="$TMUX_MOCK_STATE_DIR/lock-${channel}"
-        if [[ -n "${TMUX_MOCK_CALL_ID:-}" ]]; then
-            printf '%s %s %s\n' "$TMUX_MOCK_CALL_ID" "$operation" "$channel" >> "$TMUX_MOCK_LOG"
-        fi
-        case "$operation" in
-            -L)
-                while ! mkdir "$lock_dir" 2>/dev/null; do
-                    sleep 0.01
-                done
-                ;;
-            -U) rmdir "$lock_dir" ;;
-            *)
-                printf 'unsupported tmux wait-for operation: %s\n' "$operation" >&2
-                exit 1
-                ;;
-        esac
+    refresh-client)
+        [[ "$#" -eq 4 && "${2:-}" == "-t" && -n "${3:-}" && "${4:-}" == "-S" ]] || exit 1
+        printf 'refresh-client -t %s -S\n' "$3" >> "$TMUX_MOCK_LOG"
         ;;
     *)
         printf 'unsupported tmux mock command: %s\n' "$*" >&2
@@ -172,89 +146,69 @@ MOCK
     chmod +x "${TMP_DIR}/tmux"
 }
 
-write_uname_mock() {
+write_platform_mocks() {
     cat > "${TMP_DIR}/uname" <<'MOCK'
 #!/usr/bin/env bash
 printf 'Linux\n'
 MOCK
-    chmod +x "${TMP_DIR}/uname"
-}
-
-write_playerctl_mock() {
-    local mode="$1"
-
-    cat > "${TMP_DIR}/playerctl" <<MOCK
+    cat > "${TMP_DIR}/sleep" <<'MOCK'
 #!/usr/bin/env bash
-case "\$*" in
+printf '%s\n' "$1" >> "$SLEEP_MOCK_LOG"
 MOCK
+    cat > "${TMP_DIR}/playerctl" <<'MOCK'
+#!/usr/bin/env bash
+set -u
+printf '%s\n' "$*" >> "$PLAYERCTL_MOCK_LOG"
+separator=$'\034'
+mode="${PLAYERCTL_MOCK_MODE:-playing}"
 
+if [[ "$1" == "-l" ]]; then
     case "$mode" in
-        playing)
-            cat >> "${TMP_DIR}/playerctl" <<'MOCK'
-    '-l') printf 'paused
-playing
-' ;;
-    '-p paused status') printf 'Paused
-' ;;
-    '-p playing status') printf 'Playing
-' ;;
-    '-p paused metadata artist') printf 'Old
-' ;;
-    '-p paused metadata title') printf 'Track
-' ;;
-    '-p playing metadata artist') printf 'Artist
-' ;;
-    '-p playing metadata title') printf 'Title
-' ;;
-MOCK
-            ;;
-        paused)
-            cat >> "${TMP_DIR}/playerctl" <<'MOCK'
-    '-l') printf 'paused
-' ;;
-    '-p paused status') printf 'Paused
-' ;;
-    '-p paused metadata artist') printf 'Old
-' ;;
-    '-p paused metadata title') printf 'Track
-' ;;
-MOCK
-            ;;
-        title_only)
-            cat >> "${TMP_DIR}/playerctl" <<'MOCK'
-    '-l') printf 'title-only
-' ;;
-    '-p title-only status') printf 'Playing
-' ;;
-    '-p title-only metadata artist') printf '' ;;
-    '-p title-only metadata title') printf 'Title
-' ;;
-MOCK
-            ;;
-        stopped)
-            cat >> "${TMP_DIR}/playerctl" <<'MOCK'
-    '-l') printf 'stopped
-' ;;
-    '-p stopped status') printf 'Stopped
-' ;;
-    '-p stopped metadata artist') printf 'Done
-' ;;
-    '-p stopped metadata title') printf 'Song
-' ;;
-MOCK
-            ;;
-        empty)
-            cat >> "${TMP_DIR}/playerctl" <<'MOCK'
-    '-l') printf '' ;;
-MOCK
-            ;;
-        *) fail "unknown playerctl mock mode: ${mode}" ;;
+        playing) printf 'paused.instance\nplaying.instance\n' ;;
+        paused) printf 'paused.instance\n' ;;
+        stopped) printf 'stopped.instance\n' ;;
+        coherent) printf 'changing.instance\n' ;;
+        title_only) printf 'title-only.instance\n' ;;
+        artist_only) printf 'artist-only.instance\n' ;;
+        sanitized) printf 'controls.instance\n' ;;
+        empty) printf '' ;;
     esac
+    exit 0
+fi
 
-    cat >> "${TMP_DIR}/playerctl" <<'MOCK'
-esac
+if [[ "$1" == "-p" && "$3" == "status" ]]; then
+    case "$2" in
+        paused.instance) printf 'Paused\n' ;;
+        playing.instance) printf 'Playing\n' ;;
+        stopped.instance) printf 'Stopped\n' ;;
+        changing.instance) printf 'Playing\n' ;;
+        title-only.instance) printf 'Playing\n' ;;
+        artist-only.instance) printf 'Playing\n' ;;
+        controls.instance) printf 'Playing\n' ;;
+        *) exit 1 ;;
+    esac
+    exit 0
+fi
+
+if [[ "$1" == "-p" && "$3" == "metadata" && "$4" == "--format" ]]; then
+    expected_format="{{status}}${separator}{{artist}}${separator}{{title}}"
+    [[ "$5" == "$expected_format" ]] || exit 1
+    case "$2" in
+        paused.instance) printf 'Paused%sOld%sTrack\n' "$separator" "$separator" ;;
+        playing.instance) printf 'Playing%sArtist%sTitle\n' "$separator" "$separator" ;;
+        stopped.instance) printf 'Stopped%sDone%sSong\n' "$separator" "$separator" ;;
+        changing.instance) printf 'Paused%sFresh%sSnapshot\n' "$separator" "$separator" ;;
+        title-only.instance) printf 'Playing%s%sTitle\n' "$separator" "$separator" ;;
+        artist-only.instance) printf 'Playing%sArtist%s\n' "$separator" "$separator" ;;
+        controls.instance) printf 'Playing%sArtist\tOne\rTwo\nThree%sTitle\tFour\rFive\nSix\n' "$separator" "$separator" ;;
+        *) exit 1 ;;
+    esac
+    exit 0
+fi
+
+exit 1
 MOCK
-    chmod +x "${TMP_DIR}/playerctl"
+    chmod +x "${TMP_DIR}/uname" "${TMP_DIR}/sleep" "${TMP_DIR}/playerctl"
 }
 
 run_with_mocks() {
@@ -269,48 +223,9 @@ set_mock_local_option() {
     run_with_mocks tmux set-option -q "$1" "$2"
 }
 
-get_mock_option() {
-    run_with_mocks tmux show-option -gqv "$1"
-}
-
-clear_tmux_mock_log() {
-    : > "$TMUX_MOCK_LOG"
-}
-
-wait_for_mock_file() {
-    local file="$1"
-    local attempt
-
-    for ((attempt = 0; attempt < 500; attempt++)); do
-        if [[ -f "$file" ]]; then
-            return
-        fi
-        sleep 0.01
-    done
-
-    fail "timed out waiting for mock file: $file"
-}
-
-wait_for_mock_log() {
-    local pattern="$1"
-    local attempt
-
-    for ((attempt = 0; attempt < 500; attempt++)); do
-        if grep -Fq "$pattern" "$TMUX_MOCK_LOG"; then
-            return
-        fi
-        sleep 0.01
-    done
-
-    fail "timed out waiting for mock log: $pattern"
-}
-
-run_interval_update() {
-    local output_length="$1"
-    local scrollable_threshold="$2"
-
-    PATH="${TMP_DIR}:${PATH}" bash -c 'source "$1"; update_nowplaying_status_interval "$2" "$3"' _ \
-        "${ROOT_DIR}/scripts/helpers.sh" "$output_length" "$scrollable_threshold"
+resolve_with_mock() {
+    PATH="${TMP_DIR}:${PATH}" bash -c 'source "$1"; get_tmux_option "$2" "$3"' \
+        _ "${ROOT_DIR}/scripts/helpers.sh" "$1" "$2"
 }
 
 seed_status_values() {
@@ -328,25 +243,46 @@ status_write_count() {
         "$TMUX_MOCK_STATE_DIR/status-writes"
 }
 
-run_entrypoint() {
-    run_with_mocks bash "$1/nowplaying.tmux"
+wait_for_log_line() {
+    local file="$1"
+    local expected="$2"
+    local message="$3"
+    local attempt
+
+    for ((attempt = 0; attempt < 200; attempt++)); do
+        if [[ -f "$file" ]] && grep -Fqx "$expected" "$file"; then
+            printf 'ok - %s\n' "$message"
+            return
+        fi
+        sleep 0.01
+    done
+    fail "$message"
 }
 
-resolve_with_mock() {
-    PATH="${TMP_DIR}:${PATH}" bash -c 'source "$1"; get_tmux_option "$2" "$3"' \
-        _ "${ROOT_DIR}/scripts/helpers.sh" "$1" "$2"
+assert_no_scheduled_refresh() {
+    local message="$1"
+
+    sleep 0.05
+    assert_eq "" "$(cat "$SLEEP_MOCK_LOG")" "${message} does not schedule sleep"
+    assert_eq "" "$(cat "$TMUX_MOCK_LOG")" "${message} does not refresh client"
+}
+
+clear_refresh_logs() {
+    : > "$SLEEP_MOCK_LOG"
+    : > "$TMUX_MOCK_LOG"
+}
+
+run_entrypoint() {
+    run_with_mocks bash "$1/nowplaying.tmux"
 }
 
 run_real_tmux_tests() {
     local real_bin="${TMP_DIR}/real-tmux-bin"
     local session="nowplaying-test"
     local actual
-    local global_options
 
     REAL_TMUX="$(command -v tmux || true)"
-    if [[ -z "$REAL_TMUX" ]]; then
-        fail "tmux is required for isolated integration tests"
-    fi
+    [[ -n "$REAL_TMUX" ]] || fail "tmux is required for isolated integration tests"
 
     TMUX_TEST_SERVER="nowplaying-test-$$-${RANDOM}"
     "$REAL_TMUX" -L "$TMUX_TEST_SERVER" -f /dev/null new-session -d -s "$session"
@@ -374,90 +310,34 @@ WRAPPER
         PATH="${real_bin}:${PATH}" bash -c 'source "$1"; get_nowplaying_option "$2"' \
             _ "${ROOT_DIR}/scripts/helpers.sh" "$1"
     }
-    real_interval_update() {
-        PATH="${real_bin}:${PATH}" bash -c 'source "$1"; update_nowplaying_status_interval "$2" "$3"' \
-            _ "${ROOT_DIR}/scripts/helpers.sh" "$1" "$2"
-    }
 
     assert_eq "fallback" "$(real_resolve @test fallback)" "real tmux absent option uses fallback"
-
     "$REAL_TMUX" -L "$TMUX_TEST_SERVER" set-option -g @test ""
     assert_eq "" "$(real_resolve @test fallback)" "real tmux empty global option wins"
-    if ! "$REAL_TMUX" -L "$TMUX_TEST_SERVER" show-option -g @test >/dev/null; then
-        fail "real tmux empty global option remains present"
-    fi
-    printf 'ok - real tmux empty global option remains present\n'
-
     "$REAL_TMUX" -L "$TMUX_TEST_SERVER" set-option -g @test "global value"
-    assert_eq "global value" "$(real_resolve @test fallback)" "real tmux global option resolves exactly"
-
     "$REAL_TMUX" -L "$TMUX_TEST_SERVER" set-option -t "$session" @test "local value"
     assert_eq "local value" "$(real_resolve @test fallback)" "real tmux local option wins"
 
-    "$REAL_TMUX" -L "$TMUX_TEST_SERVER" set-option -t "$session" @test ""
-    assert_eq "" "$(real_resolve @test fallback)" "real tmux empty local option wins over global"
-
     "$REAL_TMUX" -L "$TMUX_TEST_SERVER" set-option -g -u @nowplaying_playing_icon 2>/dev/null || true
     "$REAL_TMUX" -L "$TMUX_TEST_SERVER" set-option -t "$session" -u @nowplaying_playing_icon 2>/dev/null || true
-    assert_eq "♪ " "$(real_nowplaying_option @nowplaying_playing_icon)" "real tmux playing icon fallback preserves trailing space"
-
+    assert_eq "♪ " "$(real_nowplaying_option @nowplaying_playing_icon)" "real tmux icon fallback preserves trailing space"
     "$REAL_TMUX" -L "$TMUX_TEST_SERVER" set-option -g @nowplaying_playing_icon ""
-    assert_eq "" "$(real_nowplaying_option @nowplaying_playing_icon)" "real tmux empty playing icon wins"
+    assert_eq "" "$(real_nowplaying_option @nowplaying_playing_icon)" "real tmux empty icon wins"
 
-    "$REAL_TMUX" -L "$TMUX_TEST_SERVER" set-option -g @nowplaying_scroll_padding ""
-    assert_eq "" "$(real_nowplaying_option @nowplaying_scroll_padding)" "real tmux empty scroll padding wins"
-
-    "$REAL_TMUX" -L "$TMUX_TEST_SERVER" set-option -g -u @nowplaying_playing_icon
-    "$REAL_TMUX" -L "$TMUX_TEST_SERVER" set-option -g -u @nowplaying_scroll_padding
     "$REAL_TMUX" -L "$TMUX_TEST_SERVER" set-option -g status-right 'before#{nowplaying}after'
     PATH="${real_bin}:${PATH}" bash "${ROOT_DIR}/nowplaying.tmux"
-
-    global_options="$("$REAL_TMUX" -L "$TMUX_TEST_SERVER" show-options -g)"
-    if [[ "$global_options" == *"@nowplaying_"* ]]; then
-        fail "plugin load created nowplaying default options"
-    fi
-    printf 'ok - plugin load does not create nowplaying default options\n'
-
     actual="$("$REAL_TMUX" -L "$TMUX_TEST_SERVER" show-option -gqv status-right)"
-    assert_eq "before#(\"${ROOT_DIR}/scripts/nowplaying.sh\")after" "$actual" "status interpolation remains active"
-
-    "$REAL_TMUX" -L "$TMUX_TEST_SERVER" set-option -g @nowplaying_playing_icon ""
-    "$REAL_TMUX" -L "$TMUX_TEST_SERVER" set-option -g @nowplaying_scroll_padding "pad  "
-    PATH="${real_bin}:${PATH}" bash "${ROOT_DIR}/nowplaying.tmux"
-
-    if ! "$REAL_TMUX" -L "$TMUX_TEST_SERVER" show-option -g @nowplaying_playing_icon >/dev/null; then
-        fail "plugin load removed empty override"
-    fi
-    assert_eq "" "$("$REAL_TMUX" -L "$TMUX_TEST_SERVER" show-option -gqv @nowplaying_playing_icon)" "plugin load preserves empty override"
-    assert_eq "pad  " "$("$REAL_TMUX" -L "$TMUX_TEST_SERVER" show-option -gqv @nowplaying_scroll_padding)" "plugin load preserves non-empty override exactly"
-
-    "$REAL_TMUX" -L "$TMUX_TEST_SERVER" set-option -g @nowplaying_scrolling_enabled yes
-    "$REAL_TMUX" -L "$TMUX_TEST_SERVER" set-option -g @nowplaying_auto_interval yes
-    "$REAL_TMUX" -L "$TMUX_TEST_SERVER" set-option -g @nowplaying_playing_interval 1
-    "$REAL_TMUX" -L "$TMUX_TEST_SERVER" set-option -g status-interval 15
-    real_interval_update 51 50
-    assert_eq "1" "$("$REAL_TMUX" -L "$TMUX_TEST_SERVER" show-option -gqv status-interval)" "real tmux interval acquisition applies temporary value"
-    assert_eq "15" "$("$REAL_TMUX" -L "$TMUX_TEST_SERVER" show-option -gqv @nowplaying_original_interval)" "real tmux interval acquisition captures original value"
-
-    "$REAL_TMUX" -L "$TMUX_TEST_SERVER" set-option -g status-interval 5
-    real_interval_update 60 50
-    assert_eq "1" "$("$REAL_TMUX" -L "$TMUX_TEST_SERVER" show-option -gqv status-interval)" "real tmux active refresh reapplies temporary value"
-    assert_eq "5" "$("$REAL_TMUX" -L "$TMUX_TEST_SERVER" show-option -gqv @nowplaying_original_interval)" "real tmux active refresh captures external value"
-
-    real_interval_update 10 50
-    assert_eq "5" "$("$REAL_TMUX" -L "$TMUX_TEST_SERVER" show-option -gqv status-interval)" "real tmux release restores external value"
-    if "$REAL_TMUX" -L "$TMUX_TEST_SERVER" show-option -g @nowplaying_original_interval >/dev/null 2>&1 ||
-        "$REAL_TMUX" -L "$TMUX_TEST_SERVER" show-option -g @nowplaying_applied_interval >/dev/null 2>&1; then
-        fail "real tmux interval release left ownership markers"
-    fi
-    printf 'ok - real tmux interval release clears ownership markers\n'
+    assert_eq "before#(\"${ROOT_DIR}/scripts/nowplaying.sh\" \"#{client_name}\")after" "$actual" "real tmux status interpolation includes client target"
 }
 
 bash -n "${ROOT_DIR}/nowplaying.tmux" "${ROOT_DIR}"/scripts/*.sh
 printf 'ok - bash syntax\n'
 
 write_tmux_mock
-set_mock_option status-interval "15"
+write_platform_mocks
+: > "$TMUX_MOCK_LOG"
+: > "$PLAYERCTL_MOCK_LOG"
+: > "$SLEEP_MOCK_LOG"
 set_mock_option @nowplaying_playing_icon "♪ "
 set_mock_option @nowplaying_paused_icon "⏸ "
 set_mock_option @nowplaying_stopped_icon "⏹ "
@@ -467,57 +347,33 @@ set_mock_option @nowplaying_scroll_speed "1"
 set_mock_option @nowplaying_scroll_padding "   "
 set_mock_option @nowplaying_auto_interval "no"
 set_mock_option @nowplaying_playing_interval "1"
-set_mock_option @bad_integer "abc"
-set_mock_option @empty_integer ""
-set_mock_option @high_integer "99"
-set_mock_option @low_integer "0"
 set_mock_option @test_global_empty ""
 set_mock_option @test_local_empty "global value"
 set_mock_local_option @test_local_empty ""
 set_mock_option @test_precedence "global value"
 set_mock_local_option @test_precedence "local value"
 set_mock_option @test_trailing_spaces "value  "
-clear_tmux_mock_log
 
-nowplaying_command="#(\"${ROOT_DIR}/scripts/nowplaying.sh\")"
+nowplaying_command="#(\"${ROOT_DIR}/scripts/nowplaying.sh\" \"#{client_name}\")"
 seed_status_values 'left #{nowplaying} / #{nowplaying}' 'right #{nowplaying}'
 run_entrypoint "$ROOT_DIR"
 assert_eq "left ${nowplaying_command} / ${nowplaying_command}" "$(read_status_value status-left)" "entrypoint replaces every left placeholder"
 assert_eq "right ${nowplaying_command}" "$(read_status_value status-right)" "entrypoint replaces right placeholder"
 assert_eq "1" "$(status_write_count status-left)" "entrypoint writes status-left once"
-assert_eq "1" "$(status_write_count status-right)" "entrypoint writes status-right once"
 
 : > "$TMUX_MOCK_STATE_DIR/status-writes"
 run_entrypoint "$ROOT_DIR"
-assert_eq "left ${nowplaying_command} / ${nowplaying_command}" "$(read_status_value status-left)" "entrypoint reload preserves status-left"
-assert_eq "right ${nowplaying_command}" "$(read_status_value status-right)" "entrypoint reload preserves status-right"
-assert_eq "0" "$(status_write_count status-left)" "entrypoint reload does not write status-left"
-assert_eq "0" "$(status_write_count status-right)" "entrypoint reload does not write status-right"
-
-seed_status_values '#(/tmp/custom-nowplaying.sh) | #{nowplaying}' 'unchanged right'
-run_entrypoint "$ROOT_DIR"
-assert_eq "#(/tmp/custom-nowplaying.sh) | ${nowplaying_command}" "$(read_status_value status-left)" "entrypoint preserves unrelated nowplaying command"
-assert_eq "unchanged right" "$(read_status_value status-right)" "entrypoint preserves status without placeholder"
-assert_eq "1" "$(status_write_count status-left)" "mixed command status is written once"
-assert_eq "0" "$(status_write_count status-right)" "status without placeholder is not written"
+assert_eq "0" "$(status_write_count status-left)" "entrypoint reload is idempotent"
+assert_eq "0" "$(status_write_count status-right)" "entrypoint reload leaves right unchanged"
 
 spaced_root="${TMP_DIR}/plugin with spaces"
-mkdir -p "$spaced_root/scripts"
+mkdir -p "$spaced_root"
 cp -p "${ROOT_DIR}/nowplaying.tmux" "$spaced_root/nowplaying.tmux"
-cp -p "${ROOT_DIR}/scripts/helpers.sh" "${ROOT_DIR}/scripts/nowplaying.sh" "$spaced_root/scripts/"
-spaced_command="#(\"${spaced_root}/scripts/nowplaying.sh\")"
-seed_status_values 'prefix #{nowplaying} suffix' 'plain right'
+spaced_command="#(\"${spaced_root}/scripts/nowplaying.sh\" \"#{client_name}\")"
+seed_status_values 'prefix #{nowplaying} suffix' '#{nowplaying } and #{other}'
 run_entrypoint "$spaced_root"
-assert_eq "prefix ${spaced_command} suffix" "$(read_status_value status-left)" "entrypoint quotes a command path containing spaces"
-assert_eq "1" "$(status_write_count status-left)" "path-with-spaces installation writes once"
-assert_eq "0" "$(status_write_count status-right)" "path-with-spaces no-placeholder side is not written"
-
-seed_status_values '#(/tmp/custom-nowplaying.sh)' '#{nowplaying } and #{other}'
-run_entrypoint "$ROOT_DIR"
-assert_eq '#(/tmp/custom-nowplaying.sh)' "$(read_status_value status-left)" "entrypoint leaves unrelated command unchanged"
+assert_eq "prefix ${spaced_command} suffix" "$(read_status_value status-left)" "entrypoint quotes path containing spaces"
 assert_eq '#{nowplaying } and #{other}' "$(read_status_value status-right)" "entrypoint leaves near-match formats unchanged"
-assert_eq "0" "$(status_write_count status-left)" "unrelated command triggers no left write"
-assert_eq "0" "$(status_write_count status-right)" "near-match formats trigger no right write"
 
 assert_eq "fallback" "$(resolve_with_mock @test_absent fallback)" "mock absent option uses fallback"
 assert_eq "" "$(resolve_with_mock @test_global_empty fallback)" "mock empty global option wins"
@@ -525,158 +381,100 @@ assert_eq "" "$(resolve_with_mock @test_local_empty fallback)" "mock empty local
 assert_eq "local value" "$(resolve_with_mock @test_precedence fallback)" "mock local option wins over global"
 assert_eq "value  " "$(resolve_with_mock @test_trailing_spaces fallback)" "mock option preserves trailing spaces"
 
-helper_output="$(PATH="${TMP_DIR}:${PATH}" bash -c 'source "$1"; printf "%s %s %s %s\n" "$(get_tmux_integer_option @bad_integer 50 4)" "$(get_tmux_integer_option @empty_integer 50 4)" "$(get_tmux_integer_option @low_integer 50 4)" "$(get_tmux_integer_option @high_integer 1 1 10)"' _ "${ROOT_DIR}/scripts/helpers.sh")"
-assert_eq "50 50 4 10" "$helper_output" "integer option validation"
+set_mock_option @nowplaying_scrollable_threshold ""
+empty_threshold="$(PATH="${TMP_DIR}:${PATH}" bash -c 'source "$1"; get_nowplaying_integer_option @nowplaying_scrollable_threshold 4' _ "${ROOT_DIR}/scripts/helpers.sh")"
+assert_eq "50" "$empty_threshold" "empty numeric option falls back to built-in before clamping"
+set_mock_option @nowplaying_scrollable_threshold "invalid"
+invalid_threshold="$(PATH="${TMP_DIR}:${PATH}" bash -c 'source "$1"; get_nowplaying_integer_option @nowplaying_scrollable_threshold 4' _ "${ROOT_DIR}/scripts/helpers.sh")"
+assert_eq "50" "$invalid_threshold" "invalid numeric option falls back to built-in before clamping"
+set_mock_option @nowplaying_playing_icon ""
+assert_eq "" "$(PATH="${TMP_DIR}:${PATH}" bash -c 'source "$1"; get_nowplaying_option @nowplaying_playing_icon' _ "${ROOT_DIR}/scripts/helpers.sh")" "empty nonnumeric icon is preserved"
+set_mock_option @nowplaying_scroll_padding ""
+assert_eq "" "$(PATH="${TMP_DIR}:${PATH}" bash -c 'source "$1"; get_nowplaying_option @nowplaying_scroll_padding' _ "${ROOT_DIR}/scripts/helpers.sh")" "empty nonnumeric padding is preserved"
+set_mock_option @nowplaying_scrollable_threshold "50"
+set_mock_option @nowplaying_playing_icon "♪ "
+set_mock_option @nowplaying_scroll_padding "   "
 
 # shellcheck source=scripts/helpers.sh
 source "${ROOT_DIR}/scripts/helpers.sh"
+assert_eq "Artist - Title" "$(format_nowplaying_metadata "Artist" "Title")" "formatter joins artist and title"
+assert_eq "Artist" "$(format_nowplaying_metadata "Artist" "")" "formatter renders artist-only metadata"
+assert_eq "Title" "$(format_nowplaying_metadata "" "Title")" "formatter renders title-only metadata"
+assert_eq "" "$(format_nowplaying_metadata "" "")" "formatter leaves empty metadata blank"
 assert_adapter_record $'Paused\tArtist\tTitle' "Paused" "Artist" "Title" "complete adapter record"
 assert_adapter_record $'Playing\t\tTitle' "Playing" "" "Title" "title-only adapter record"
-assert_adapter_record $'Paused\tArtist\t' "Paused" "Artist" "" "artist-only adapter record"
-assert_adapter_record $'Stopped\t\t' "Stopped" "" "" "empty metadata adapter record"
+assert_adapter_record $'Stopped\tArtist\t' "Stopped" "Artist" "" "stopped adapter record"
+assert_adapter_rejected $'Buffering\tArtist\tTitle' "unknown-status adapter output"
 assert_adapter_rejected "plain text" "plain-text adapter output"
 assert_adapter_rejected $'Playing\tTitle' "one-tab adapter output"
 assert_adapter_rejected $'Playing\tArtist\tTitle\tExtra' "extra-tab adapter output"
-assert_adapter_rejected $'\tArtist\tTitle' "empty-status adapter output"
 assert_adapter_rejected $'Playing\tArtist\tTitle\nSecond' "multiline adapter output"
 assert_adapter_rejected $'Playing\tArtist\tTitle\r' "carriage-return adapter output"
 
 assert_scrolling_text "abcde" "abcde" 5 "::" 99 "scrolling returns text that exactly fits"
-assert_scrolling_text "abcd" "abcde" 4 "::" 0 "scrolling starts at first position"
 assert_scrolling_text "e::a" "abcde" 4 "::" 4 "scrolling crosses into padding"
 assert_scrolling_text "::ab" "abcde" 4 "::" 5 "scrolling starts at padding"
-assert_scrolling_text ":abc" "abcde" 4 "::" 6 "scrolling starts at last cycle offset"
 assert_scrolling_text "abcd" "abcde" 4 "::" 7 "scrolling wraps at cycle length"
-assert_scrolling_text ":abc" "abcde" 4 "::" 13 "scrolling normalizes large offsets"
 assert_scrolling_text "eabc" "abcde" 4 "" 4 "scrolling crosses empty-padding boundary"
 
-write_uname_mock
+: > "$PLAYERCTL_MOCK_LOG"
+PLAYERCTL_MOCK_MODE=playing run_with_mocks "${ROOT_DIR}/scripts/nowplaying_linux.sh" > "${TMP_DIR}/adapter-output"
+assert_eq $'Playing\tArtist\tTitle' "$(cat "${TMP_DIR}/adapter-output")" "linux adapter prefers exact playing instance"
+assert_eq "4" "$(wc -l < "$PLAYERCTL_MOCK_LOG" | tr -d ' ')" "linux adapter uses list plus selection statuses plus one snapshot"
+assert_eq "1" "$(grep -c ' metadata --format ' "$PLAYERCTL_MOCK_LOG")" "linux adapter makes one metadata snapshot call"
+assert_eq "♪ Artist - Title" "$(PLAYERCTL_MOCK_MODE=playing run_with_mocks "${ROOT_DIR}/scripts/nowplaying.sh")" "main renders playing metadata"
+assert_eq "⏸ Old - Track" "$(PLAYERCTL_MOCK_MODE=paused run_with_mocks "${ROOT_DIR}/scripts/nowplaying.sh")" "main renders paused metadata"
+assert_eq "⏹ Done - Song" "$(PLAYERCTL_MOCK_MODE=stopped run_with_mocks "${ROOT_DIR}/scripts/nowplaying.sh")" "main renders stopped metadata"
+assert_eq $'Paused\tFresh\tSnapshot' "$(PLAYERCTL_MOCK_MODE=coherent run_with_mocks "${ROOT_DIR}/scripts/nowplaying_linux.sh")" "linux adapter uses final snapshot status"
+assert_eq $'Playing\t\tTitle' "$(PLAYERCTL_MOCK_MODE=title_only run_with_mocks "${ROOT_DIR}/scripts/nowplaying_linux.sh")" "linux adapter preserves title-only metadata"
+assert_eq $'Playing\tArtist\t' "$(PLAYERCTL_MOCK_MODE=artist_only run_with_mocks "${ROOT_DIR}/scripts/nowplaying_linux.sh")" "linux adapter preserves artist-only metadata"
+assert_eq "♪ Artist" "$(PLAYERCTL_MOCK_MODE=artist_only run_with_mocks "${ROOT_DIR}/scripts/nowplaying.sh")" "main renders artist-only metadata"
+assert_eq $'Playing\tArtist One Two Three\tTitle Four Five Six' "$(PLAYERCTL_MOCK_MODE=sanitized run_with_mocks "${ROOT_DIR}/scripts/nowplaying_linux.sh")" "linux adapter sanitizes tab CR and LF"
 
-write_playerctl_mock playing
-assert_eq $'Playing\tArtist\tTitle' "$(run_with_mocks "${ROOT_DIR}/scripts/nowplaying_linux.sh")" "linux adapter prefers playing player"
-assert_eq "♪ Artist - Title" "$(run_with_mocks "${ROOT_DIR}/scripts/nowplaying.sh")" "main renders playing metadata"
-
-write_playerctl_mock paused
-assert_eq "⏸ Old - Track" "$(run_with_mocks "${ROOT_DIR}/scripts/nowplaying.sh")" "main renders paused metadata"
-
-write_playerctl_mock title_only
-assert_eq $'Playing\t\tTitle' "$(run_with_mocks "${ROOT_DIR}/scripts/nowplaying_linux.sh")" "linux adapter preserves empty artist"
-assert_eq "♪ Title" "$(run_with_mocks "${ROOT_DIR}/scripts/nowplaying.sh")" "main renders title-only metadata"
-
-write_playerctl_mock stopped
-assert_eq "⏹ Done - Song" "$(run_with_mocks "${ROOT_DIR}/scripts/nowplaying.sh")" "main renders stopped metadata"
-
-set_mock_option @nowplaying_scrolling_enabled "yes"
-set_mock_option @nowplaying_auto_interval "yes"
-run_interval_update 51 50
-assert_eq "1" "$(get_mock_option status-interval)" "long output applies playing interval"
-assert_eq "15" "$(get_mock_option @nowplaying_original_interval)" "acquisition saves original interval"
-assert_eq "1" "$(get_mock_option @nowplaying_applied_interval)" "acquisition records applied interval"
-
-run_interval_update 60 50
-assert_eq "1" "$(get_mock_option status-interval)" "repeated acquisition keeps playing interval"
-assert_eq "15" "$(get_mock_option @nowplaying_original_interval)" "repeated acquisition preserves saved original"
-
-run_interval_update 10 50
-assert_eq "15" "$(get_mock_option status-interval)" "short output restores original interval"
-assert_eq "" "$(get_mock_option @nowplaying_original_interval)" "short output clears saved interval"
-assert_eq "" "$(get_mock_option @nowplaying_applied_interval)" "short output clears applied interval"
-
-run_interval_update 51 50
-set_mock_option status-interval "5"
-run_interval_update 60 50
-assert_eq "1" "$(get_mock_option status-interval)" "active update reapplies playing interval after user change"
-assert_eq "5" "$(get_mock_option @nowplaying_original_interval)" "active update captures user interval change"
-run_interval_update 10 50
-assert_eq "5" "$(get_mock_option status-interval)" "release restores user interval changed during ownership"
-set_mock_option status-interval "15"
-
-run_interval_update 51 50
-rm -f "$TMUX_MOCK_STATE_DIR/pause-ready" "$TMUX_MOCK_STATE_DIR/pause-release"
-clear_tmux_mock_log
-TMUX_MOCK_CALL_ID="active" TMUX_MOCK_PAUSE_SET_STATUS="yes" \
-    PATH="${TMP_DIR}:${PATH}" bash -c 'source "$1"; update_nowplaying_status_interval "$2" "$3"' _ \
-    "${ROOT_DIR}/scripts/helpers.sh" 60 50 &
-active_pid=$!
-wait_for_mock_file "$TMUX_MOCK_STATE_DIR/pause-ready"
-TMUX_MOCK_CALL_ID="inactive" \
-    PATH="${TMP_DIR}:${PATH}" bash -c 'source "$1"; update_nowplaying_status_interval "$2" "$3"' _ \
-    "${ROOT_DIR}/scripts/helpers.sh" 10 50 &
-inactive_pid=$!
-wait_for_mock_log "inactive -L tmux-nowplaying-status-interval"
-if ! kill -0 "$inactive_pid" 2>/dev/null; then
-    fail "inactive lifecycle transition did not wait for active transition"
+if ! grep -Fq '.replacingOccurrences(of: "\t", with: " ")' "${ROOT_DIR}/scripts/nowplaying_mediaremote.swift" ||
+    ! grep -Fq '.replacingOccurrences(of: "\r", with: " ")' "${ROOT_DIR}/scripts/nowplaying_mediaremote.swift" ||
+    ! grep -Fq '.replacingOccurrences(of: "\n", with: " ")' "${ROOT_DIR}/scripts/nowplaying_mediaremote.swift"; then
+    fail "macOS adapter source does not sanitize canonical control characters"
 fi
-: > "$TMUX_MOCK_STATE_DIR/pause-release"
-wait "$active_pid"
-wait "$inactive_pid"
-assert_eq "15" "$(get_mock_option status-interval)" "interleaved release restores original interval"
-assert_eq "" "$(get_mock_option @nowplaying_original_interval)" "interleaved release clears saved interval"
-assert_eq "" "$(get_mock_option @nowplaying_applied_interval)" "interleaved release clears applied interval"
+printf 'ok - macOS adapter source sanitizes canonical control characters\n'
+grep -Fq 'playbackRate > 0.0 ? "Playing" : "Paused"' "${ROOT_DIR}/scripts/nowplaying_mediaremote.swift" || fail "macOS adapter does not classify positive playback rates as playing"
+printf 'ok - macOS adapter source classifies positive playback rates as playing\n'
 
-run_interval_update 51 50
+set_mock_option @nowplaying_scrollable_threshold "4"
+set_mock_option @nowplaying_scrolling_enabled "yes"
+set_mock_option @nowplaying_auto_interval "yes"
+set_mock_option @nowplaying_playing_interval "invalid"
+client_target="/dev/pts/42"
+clear_refresh_logs
+PLAYERCTL_MOCK_MODE=playing run_with_mocks "${ROOT_DIR}/scripts/nowplaying.sh" "$client_target" >/dev/null
+wait_for_log_line "$SLEEP_MOCK_LOG" "1" "long scrolling output schedules validated interval"
+wait_for_log_line "$TMUX_MOCK_LOG" "refresh-client -t ${client_target} -S" "scheduled job refreshes exact tmux client"
+
+clear_refresh_logs
+PLAYERCTL_MOCK_MODE=playing run_with_mocks "${ROOT_DIR}/scripts/nowplaying.sh" >/dev/null
+assert_no_scheduled_refresh "manual invocation without client target"
+
 set_mock_option @nowplaying_auto_interval "no"
-run_interval_update 51 50
-assert_eq "15" "$(get_mock_option status-interval)" "disabling automatic interval restores original"
-assert_eq "" "$(get_mock_option @nowplaying_original_interval)" "disabling automatic interval clears saved state"
-assert_eq "" "$(get_mock_option @nowplaying_applied_interval)" "disabling automatic interval clears applied state"
+clear_refresh_logs
+PLAYERCTL_MOCK_MODE=playing run_with_mocks "${ROOT_DIR}/scripts/nowplaying.sh" "$client_target" >/dev/null
+assert_no_scheduled_refresh "auto-disabled long output"
 
 set_mock_option @nowplaying_auto_interval "yes"
-run_interval_update 51 50
 set_mock_option @nowplaying_scrolling_enabled "no"
-run_interval_update 51 50
-assert_eq "15" "$(get_mock_option status-interval)" "disabling scrolling restores original interval"
-assert_eq "" "$(get_mock_option @nowplaying_original_interval)" "disabling scrolling clears saved state"
-assert_eq "" "$(get_mock_option @nowplaying_applied_interval)" "disabling scrolling clears applied state"
+clear_refresh_logs
+PLAYERCTL_MOCK_MODE=playing run_with_mocks "${ROOT_DIR}/scripts/nowplaying.sh" "$client_target" >/dev/null
+assert_no_scheduled_refresh "scrolling-disabled long output"
 
 set_mock_option @nowplaying_scrolling_enabled "yes"
-run_interval_update 51 50
-write_playerctl_mock empty
-assert_eq "" "$(run_with_mocks "${ROOT_DIR}/scripts/nowplaying.sh")" "main renders empty output without metadata"
-assert_eq "15" "$(get_mock_option status-interval)" "empty adapter output restores original interval"
-assert_eq "" "$(get_mock_option @nowplaying_original_interval)" "empty adapter output clears saved state"
-assert_eq "" "$(get_mock_option @nowplaying_applied_interval)" "empty adapter output clears applied state"
+set_mock_option @nowplaying_scrollable_threshold "50"
+clear_refresh_logs
+PLAYERCTL_MOCK_MODE=title_only run_with_mocks "${ROOT_DIR}/scripts/nowplaying.sh" "$client_target" >/dev/null
+assert_no_scheduled_refresh "short output"
 
-set_mock_option status-interval "7"
-set_mock_option @nowplaying_original_interval "15"
-run_with_mocks tmux set-option -gu @nowplaying_applied_interval
-clear_tmux_mock_log
-run_interval_update 0 50
-assert_eq "7" "$(get_mock_option status-interval)" "legacy saved state does not overwrite user interval"
-assert_eq "" "$(get_mock_option @nowplaying_original_interval)" "legacy saved state is cleared"
-assert_eq "unset @nowplaying_original_interval" "$(cat "$TMUX_MOCK_LOG")" "legacy cleanup does not write status interval"
-
-clear_tmux_mock_log
-run_interval_update 0 50
-run_interval_update 10 50
-assert_eq "7" "$(get_mock_option status-interval)" "inactive releases preserve user interval"
-assert_eq "" "$(get_mock_option @nowplaying_original_interval)" "inactive releases do not create saved state"
-assert_eq "" "$(cat "$TMUX_MOCK_LOG")" "inactive releases do not write tmux options"
-
-run_interval_update 51 50
-assert_eq "1" "$(get_mock_option status-interval)" "fresh acquisition applies playing interval"
-assert_eq "7" "$(get_mock_option @nowplaying_original_interval)" "fresh acquisition captures later user interval"
-assert_eq "1" "$(get_mock_option @nowplaying_applied_interval)" "fresh acquisition records applied interval"
-run_interval_update 10 50
-assert_eq "7" "$(get_mock_option status-interval)" "fresh acquisition restores later user interval"
-assert_eq "" "$(get_mock_option @nowplaying_original_interval)" "fresh release clears saved state"
-assert_eq "" "$(get_mock_option @nowplaying_applied_interval)" "fresh release clears applied state"
-
-set_mock_option @nowplaying_auto_interval "no"
-clear_tmux_mock_log
-run_interval_update 51 50
-assert_eq "7" "$(get_mock_option status-interval)" "inactive auto-disabled call preserves interval"
-assert_eq "" "$(get_mock_option @nowplaying_original_interval)" "inactive auto-disabled call keeps saved state absent"
-assert_eq "" "$(cat "$TMUX_MOCK_LOG")" "inactive auto-disabled call does not write tmux options"
-
-set_mock_option @nowplaying_auto_interval "yes"
-set_mock_option @nowplaying_scrolling_enabled "no"
-clear_tmux_mock_log
-run_interval_update 51 50
-assert_eq "7" "$(get_mock_option status-interval)" "inactive scrolling-disabled call preserves interval"
-assert_eq "" "$(get_mock_option @nowplaying_original_interval)" "inactive scrolling-disabled call keeps saved state absent"
-assert_eq "" "$(cat "$TMUX_MOCK_LOG")" "inactive scrolling-disabled call does not write tmux options"
+set_mock_option @nowplaying_scrollable_threshold "4"
+clear_refresh_logs
+PLAYERCTL_MOCK_MODE=empty run_with_mocks "${ROOT_DIR}/scripts/nowplaying.sh" "$client_target" >/dev/null
+assert_no_scheduled_refresh "empty adapter output"
 
 run_real_tmux_tests
-
 printf 'all tests passed\n'

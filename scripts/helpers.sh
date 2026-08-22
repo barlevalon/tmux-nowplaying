@@ -70,8 +70,10 @@ get_nowplaying_integer_option() {
     local option="$1"
     local min_value="${2:-}"
     local max_value="${3:-}"
+    local default_value
 
-    get_tmux_integer_option "$option" "$(get_nowplaying_option "$option")" "$min_value" "$max_value"
+    default_value="$(get_nowplaying_default_option "$option")" || default_value=""
+    get_tmux_integer_option "$option" "$default_value" "$min_value" "$max_value"
 }
 
 # Format metadata from a platform adapter into display text.
@@ -81,6 +83,8 @@ format_nowplaying_metadata() {
 
     if [ -n "$artist" ] && [ -n "$title" ]; then
         printf '%s - %s\n' "$artist" "$title"
+    elif [ -n "$artist" ]; then
+        printf '%s\n' "$artist"
     elif [ -n "$title" ]; then
         printf '%s\n' "$title"
     fi
@@ -122,7 +126,12 @@ parse_nowplaying_adapter_output() {
     parsed_status="${adapter_output_value%%$'\t'*}"
     adapter_remainder="${adapter_output_value#*$'\t'}"
 
-    if [[ -z "$parsed_status" || "$adapter_remainder" != *$'\t'* ]]; then
+    case "$parsed_status" in
+        Playing|Paused|Stopped) ;;
+        *) return 1 ;;
+    esac
+
+    if [[ "$adapter_remainder" != *$'\t'* ]]; then
         return 1
     fi
 
@@ -137,64 +146,6 @@ parse_nowplaying_adapter_output() {
     printf -v "$artist_output_name" '%s' "$parsed_artist"
     printf -v "$title_output_name" '%s' "$parsed_title"
 }
-
-# Temporarily lower status-interval for scrolling output, or restore it.
-update_nowplaying_status_interval() (
-    local output_length="$1"
-    local scrollable_threshold="$2"
-    local lock_name="tmux-nowplaying-status-interval"
-    local scrolling_enabled
-    local auto_interval
-    local original_interval
-    local applied_interval
-    local current_interval
-    local playing_interval
-    local owns_interval="no"
-
-    if ! tmux wait-for -L "$lock_name"; then
-        return
-    fi
-    trap 'tmux wait-for -U "$lock_name"' EXIT
-
-    scrolling_enabled="$(get_nowplaying_option "@nowplaying_scrolling_enabled")"
-    auto_interval="$(get_nowplaying_option "@nowplaying_auto_interval")"
-    original_interval="$(tmux show-option -gqv "@nowplaying_original_interval")"
-    applied_interval="$(tmux show-option -gqv "@nowplaying_applied_interval")"
-    current_interval="$(tmux show-option -gqv status-interval)"
-
-    if [ -n "$original_interval" ] && [ -n "$applied_interval" ]; then
-        owns_interval="yes"
-    else
-        # An unpaired marker comes from an interrupted or legacy lifecycle.
-        # It does not prove that the plugin still owns status-interval.
-        if [ -n "$original_interval" ]; then
-            tmux set-option -gu "@nowplaying_original_interval"
-        fi
-        if [ -n "$applied_interval" ]; then
-            tmux set-option -gu "@nowplaying_applied_interval"
-        fi
-    fi
-
-    if [ "$scrolling_enabled" = "yes" ] &&
-        [ "$auto_interval" = "yes" ] &&
-        [ "$output_length" -gt "$scrollable_threshold" ]; then
-        playing_interval="$(get_nowplaying_integer_option "@nowplaying_playing_interval" "1")"
-
-        if [ "$owns_interval" = "no" ] || [ "$current_interval" != "$applied_interval" ]; then
-            original_interval="$current_interval"
-            tmux set-option -gq "@nowplaying_original_interval" "$original_interval" >/dev/null
-        fi
-
-        tmux set-option -gq "@nowplaying_applied_interval" "$playing_interval" >/dev/null
-        tmux set-option -g status-interval "$playing_interval"
-    elif [ "$owns_interval" = "yes" ]; then
-        if [ "$current_interval" = "$applied_interval" ]; then
-            tmux set-option -g status-interval "$original_interval"
-        fi
-        tmux set-option -gu "@nowplaying_original_interval"
-        tmux set-option -gu "@nowplaying_applied_interval"
-    fi
-)
 
 # Scrolling text function
 # Arguments:
