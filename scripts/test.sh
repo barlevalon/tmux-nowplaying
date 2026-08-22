@@ -67,6 +67,24 @@ assert_adapter_rejected() {
     assert_eq "" "$track_title" "${message} clears title"
 }
 
+assert_scrolling_text() {
+    local expected="$1"
+    local text="$2"
+    local width="$3"
+    local padding="$4"
+    local offset="$5"
+    local message="$6"
+    local actual
+
+    actual="$(bash -c '
+        source "$1"
+        scroll_padding="$5"
+        get_nowplaying_option() { printf "%s" "$scroll_padding"; }
+        scrolling_text "$2" "$3" "$4"
+    ' _ "${ROOT_DIR}/scripts/helpers.sh" "$text" "$width" "$offset" "$padding")"
+    assert_eq "$expected" "$actual" "$message"
+}
+
 write_tmux_mock() {
     cat > "${TMP_DIR}/tmux" <<'MOCK'
 #!/usr/bin/env bash
@@ -317,6 +335,15 @@ assert_adapter_rejected $'Playing\tArtist\tTitle\tExtra' "extra-tab adapter outp
 assert_adapter_rejected $'\tArtist\tTitle' "empty-status adapter output"
 assert_adapter_rejected $'Playing\tArtist\tTitle\nSecond' "multiline adapter output"
 assert_adapter_rejected $'Playing\tArtist\tTitle\r' "carriage-return adapter output"
+
+assert_scrolling_text "abcde" "abcde" 5 "::" 99 "scrolling returns text that exactly fits"
+assert_scrolling_text "abcd" "abcde" 4 "::" 0 "scrolling starts at first position"
+assert_scrolling_text "e::a" "abcde" 4 "::" 4 "scrolling crosses into padding"
+assert_scrolling_text "::ab" "abcde" 4 "::" 5 "scrolling starts at padding"
+assert_scrolling_text ":abc" "abcde" 4 "::" 6 "scrolling starts at last cycle offset"
+assert_scrolling_text "abcd" "abcde" 4 "::" 7 "scrolling wraps at cycle length"
+assert_scrolling_text ":abc" "abcde" 4 "::" 13 "scrolling normalizes large offsets"
+assert_scrolling_text "eabc" "abcde" 4 "" 4 "scrolling crosses empty-padding boundary"
 
 write_uname_mock
 

@@ -209,22 +209,13 @@ scrolling_text() {
     # Get padding from tmux option
     local padding
     padding="$(get_nowplaying_option "@nowplaying_scroll_padding")"
+    # Duplicating the text handles slices that cross the scroll cycle boundary.
     local padded_text="${text}${padding}${text}"
-    local padded_length="${#padded_text}"
-    
+
     # Calculate the starting position based on offset
     local start_pos=$((offset % (text_length + ${#padding})))
-    
-    # Extract the visible portion efficiently
-    # If we can get the whole substring without wrapping
-    if [ $((start_pos + max_width)) -le "$padded_length" ]; then
-        printf "%.*s\n" "$max_width" "${padded_text:$start_pos}"
-    else
-        # Need to wrap around - get first part and second part
-        local first_part_len=$((padded_length - start_pos))
-        local second_part_len=$((max_width - first_part_len))
-        printf "%s%.*s\n" "${padded_text:$start_pos}" "$second_part_len" "$padded_text"
-    fi
+
+    printf '%.*s\n' "$max_width" "${padded_text:$start_pos}"
 }
 
 # Get current time in seconds for scrolling offset
